@@ -10,7 +10,12 @@ python = "^3.12"
 setuptools = "^74.1.2"
 pandas = "^2.2.2"
 scikit-learn = "^1.5.1"
+pytest = "^8.3.2"
+category-encoders = "^2.6.3"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
 
 [build-system]
 requires = ["poetry-core"]
