@@ -249,7 +249,7 @@ class DataVisualizer:
         - column (str): Name of the categorical column.
         """
         plt.figure(figsize=(8, 6))
-        sns.countplot(df, column)
+        sns.countplot(df, x=column)
         plt.title(f'Distribution of {column}')
         plt.show()
 
