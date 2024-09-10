@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import pandas as pd
-from feat_engine.feature_transformation import FeatureTransformation
+from feat_engine.transform_features import FeatureTransformer
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def sample_data() -> pd.DataFrame:
 
 def test_log_transform(sample_data: pd.DataFrame) -> None:
     """Test log transformation."""
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
     df_log = ft.log_transform(sample_data.copy(), ['x1', 'x2'])
 
     # Verify the transformation
@@ -27,7 +27,7 @@ def test_log_transform(sample_data: pd.DataFrame) -> None:
 
 def test_sqrt_transform(sample_data: pd.DataFrame) -> None:
     """Test square root transformation."""
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
     df_sqrt = ft.sqrt_transform(sample_data.copy(), ['x1', 'x2'])
 
     # Verify the transformation
@@ -37,7 +37,7 @@ def test_sqrt_transform(sample_data: pd.DataFrame) -> None:
 
 def test_zscore_standardization(sample_data: pd.DataFrame) -> None:
     """Test Z-score standardization."""
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
     df_zscore = ft.zscore_standardization(sample_data.copy(), ['x1', 'x3'])
 
     # Verify the transformation: Z-score should have mean 0 and std 1
@@ -49,7 +49,7 @@ def test_zscore_standardization(sample_data: pd.DataFrame) -> None:
 
 def test_min_max_scaling(sample_data: pd.DataFrame) -> None:
     """Test min-max scaling."""
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
     df_minmax = ft.min_max_scaling(sample_data.copy(), ['x1', 'x3'])
 
     # Verify the transformation: Min-Max scaling should scale values between 0 and 1
@@ -61,7 +61,7 @@ def test_min_max_scaling(sample_data: pd.DataFrame) -> None:
 
 def test_quantile_transform(sample_data: pd.DataFrame) -> None:
     """Test quantile transformation."""
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
 
     # Set n_quantiles to match the number of samples (4) to avoid warnings and ensure proper transformation
     df_quantile = ft.quantile_transform(sample_data.copy(), ['x1', 'x3'], output_distribution='normal')
@@ -76,7 +76,7 @@ def test_quantile_transform(sample_data: pd.DataFrame) -> None:
 def test_boxcox_transform(sample_data: pd.DataFrame) -> None:
     """Test Box-Cox transformation."""
     sample_data['x1'] = sample_data['x1'].clip(lower=1e-6)  # Ensure strictly positive values for Box-Cox
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
     df_boxcox = ft.boxcox_transform(sample_data.copy(), 'x1')
 
     # Verify the transformation: Box-Cox should result in normalized data (approximately Gaussian)
@@ -85,7 +85,7 @@ def test_boxcox_transform(sample_data: pd.DataFrame) -> None:
 
 def test_rank_transform(sample_data: pd.DataFrame) -> None:
     """Test rank transformation."""
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
     df_rank = ft.rank_transform(sample_data.copy(), ['x1', 'x2'])
 
     # Verify the transformation: Values should be ranked
@@ -95,7 +95,7 @@ def test_rank_transform(sample_data: pd.DataFrame) -> None:
 
 def test_discrete_fourier_transform(sample_data: pd.DataFrame) -> None:
     """Test discrete Fourier transform."""
-    ft = FeatureTransformation()
+    ft = FeatureTransformer()
     df_fft = ft.discrete_fourier_transform(sample_data.copy(), ['x1', 'x2'])
 
     # Verify the transformation: Fourier transformed values should match the real part of FFT

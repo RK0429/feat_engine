@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from feat_engine.scaling_normalization import ScalingNormalizer
+from feat_engine.normalize_scaling import ScalingNormalizer
 # from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
@@ -9,7 +9,7 @@ from sklearn.exceptions import NotFittedError
 
 
 @pytest.fixture
-def sample_data():
+def sample_data() -> pd.DataFrame:
     return pd.DataFrame({
         'A': [1, 2, 3, 4, 5],
         'B': [10, 20, 30, 40, 50],
@@ -17,7 +17,7 @@ def sample_data():
     })
 
 
-def test_standard_scaler(sample_data):
+def test_standard_scaler(sample_data: pd.DataFrame) -> None:
     scaler = ScalingNormalizer(method='standard')
     transformed = scaler.fit_transform(sample_data)
 
@@ -28,7 +28,7 @@ def test_standard_scaler(sample_data):
     assert np.allclose(transformed.std(ddof=0), expected_std, atol=1e-6)  # Use ddof=0 for population std
 
 
-def test_minmax_scaler(sample_data):
+def test_minmax_scaler(sample_data: pd.DataFrame) -> None:
     scaler = ScalingNormalizer(method='minmax')
     transformed = scaler.fit_transform(sample_data)
 
@@ -39,7 +39,7 @@ def test_minmax_scaler(sample_data):
     assert np.allclose(transformed.max(), expected_max, atol=1e-6)
 
 
-def test_robust_scaler(sample_data):
+def test_robust_scaler(sample_data: pd.DataFrame) -> None:
     scaler = ScalingNormalizer(method='robust')
     transformed = scaler.fit_transform(sample_data)
 
@@ -49,7 +49,7 @@ def test_robust_scaler(sample_data):
     assert np.allclose(transformed.median(), expected_median, atol=1e-6)
 
 
-def test_l2_normalizer(sample_data):
+def test_l2_normalizer(sample_data: pd.DataFrame) -> None:
     scaler = ScalingNormalizer(method='l2')
     transformed = scaler.fit_transform(sample_data)
 
@@ -60,13 +60,13 @@ def test_l2_normalizer(sample_data):
     assert np.allclose(row_norms, expected_norm, atol=1e-6)
 
 
-def test_not_fitted_error(sample_data):
+def test_not_fitted_error(sample_data: pd.DataFrame) -> None:
     scaler = ScalingNormalizer(method='standard')
     with pytest.raises(NotFittedError):
         scaler.transform(sample_data)
 
 
-def test_column_transformer(sample_data):
+def test_column_transformer(sample_data: pd.DataFrame) -> None:
     column_methods = {
         'A': 'minmax',
         'B': 'standard',
@@ -79,7 +79,7 @@ def test_column_transformer(sample_data):
     assert transformed.shape == sample_data.shape
 
 
-def test_pipeline_with_logistic_regression(sample_data):
+def test_pipeline_with_logistic_regression(sample_data: pd.DataFrame) -> None:
     X = sample_data[['A', 'B', 'C']]
     y = [0, 1, 0, 1, 0]  # Some dummy target values for testing
 

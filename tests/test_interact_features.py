@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from feat_engine.feature_interaction import FeatureInteraction
+from feat_engine.interact_features import FeatureInteraction
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from feat_engine.encoding_categorical import CategoricalEncoder
+from feat_engine.encode_category import CategoricalEncoder
 from typing import Dict
 
 

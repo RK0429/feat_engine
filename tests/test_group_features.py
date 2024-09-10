@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from feat_engine.feature_grouping import FeatureGrouping
+from feat_engine.group_features import FeatureGrouping
 
 
 @pytest.fixture

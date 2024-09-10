@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from feat_engine.handling_outliers import OutlierHandling
+from feat_engine.handle_outliers import OutlierHandler
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_z_score_detection(sample_data: pd.DataFrame) -> None:
     - Whether the last row is detected as an outlier.
     - Other rows are not detected as outliers.
     """
-    oh = OutlierHandling()
+    oh = OutlierHandler()
     z_outliers = oh.z_score_detection(sample_data, threshold=2)
 
     assert z_outliers.iloc[-1].all()  # Last row should have outliers
@@ -48,7 +48,7 @@ def test_iqr_detection(sample_data: pd.DataFrame) -> None:
     - Whether the last row is detected as an outlier.
     - Other rows are not detected as outliers.
     """
-    oh = OutlierHandling()
+    oh = OutlierHandler()
     iqr_outliers = oh.iqr_detection(sample_data)
 
     assert iqr_outliers.iloc[-1].all()  # Last row should have outliers
@@ -66,7 +66,7 @@ def test_isolation_forest_detection(sample_data: pd.DataFrame) -> None:
     - Whether the last row is detected as an outlier.
     - Other rows are not detected as outliers.
     """
-    oh = OutlierHandling()
+    oh = OutlierHandler()
     iso_forest_outliers = oh.isolation_forest_detection(sample_data)
 
     assert iso_forest_outliers.iloc[-1]  # Last row should be an outlier
@@ -84,7 +84,7 @@ def test_dbscan_detection(sample_data: pd.DataFrame) -> None:
     - Whether the last row is detected as an outlier.
     - Other rows are not detected as outliers.
     """
-    oh = OutlierHandling()
+    oh = OutlierHandler()
     dbscan_outliers = oh.dbscan_detection(sample_data, eps=20, min_samples=2)
 
     assert dbscan_outliers.iloc[-1]  # Last row should be an outlier
@@ -101,7 +101,7 @@ def test_robust_scaler(sample_data: pd.DataFrame) -> None:
     Asserts:
     - The scaled values are within a reasonable range.
     """
-    oh = OutlierHandling()
+    oh = OutlierHandler()
     robust_scaled_df = oh.robust_scaler(sample_data, 0.2, 0.8)
 
     assert robust_scaled_df.max().max() <= 5  # Adjust the expected range
@@ -118,7 +118,7 @@ def test_winsorization(sample_data: pd.DataFrame) -> None:
     Asserts:
     - Extreme values are within a reasonable range after Winsorization.
     """
-    oh = OutlierHandling()
+    oh = OutlierHandler()
     winsorized_df = oh.winsorization(sample_data, limits=(0.2, 0.2))
 
     assert winsorized_df.max().max() <= 100  # Ensure extreme high values are capped
@@ -135,7 +135,7 @@ def test_cap_outliers(sample_data: pd.DataFrame) -> None:
     Asserts:
     - Outliers are capped within the IQR bounds.
     """
-    oh = OutlierHandling()
+    oh = OutlierHandler()
     capped_df = oh.cap_outliers(sample_data, method='iqr', range_ratio=0.4)
 
     assert capped_df.max().max() <= 100  # Ensure extreme high values are capped

@@ -1,14 +1,14 @@
 # feat_engine/__init__.py
 
-from .handling_missing_values import MissingValueHandler
-from .scaling_normalization import ScalingNormalizer
-from .encoding_categorical import CategoricalEncoder
-from .feature_interaction import FeatureInteraction
-from .feature_transformation import FeatureTransformation
-from .dimensionality_reduction import DimensionalityReduction
-from .handling_outliers import OutlierHandling
-from .temporal_features import TemporalFeatureEngineering
-from .feature_grouping import FeatureGrouping
+from .handle_missing_values import MissingValueHandler
+from .normalize_scaling import ScalingNormalizer
+from .encode_category import CategoricalEncoder
+from .interact_features import FeatureInteraction
+from .transform_features import FeatureTransformer
+from .reduce_dimension import DimensionReducer
+from .handle_outliers import OutlierHandler
+from .temporal_features import TemporalFeatures
+from .group_features import FeatureGrouping
 from .target_based_features import TargetBasedFeatures
 
 __all__ = [
@@ -16,10 +16,10 @@ __all__ = [
     'ScalingNormalizer',
     'CategoricalEncoder',
     'FeatureInteraction',
-    'FeatureTransformation',
-    'DimensionalityReduction',
-    'OutlierHandling',
-    'TemporalFeatureEngineering',
+    'FeatureTransformer',
+    'DimensionReducer',
+    'OutlierHandler',
+    'TemporalFeatures',
     'FeatureGrouping',
     'TargetBasedFeatures'
 ]

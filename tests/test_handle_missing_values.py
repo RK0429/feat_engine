@@ -6,7 +6,7 @@ from feat_engine import MissingValueHandler
 
 # Test data for missing value handling
 @pytest.fixture
-def sample_data():
+def sample_data() -> pd.DataFrame:
     return pd.DataFrame({
         'A': [1, 2, np.nan, 4],
         'B': [np.nan, 5, 6, np.nan],
@@ -14,7 +14,7 @@ def sample_data():
     })
 
 
-def test_identify_missing(sample_data):
+def test_identify_missing(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.identify_missing(sample_data)
     expected = pd.DataFrame({
         'A': [False, False, True, False],
@@ -24,13 +24,13 @@ def test_identify_missing(sample_data):
     pd.testing.assert_frame_equal(result, expected)
 
 
-def test_missing_summary(sample_data):
+def test_missing_summary(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.missing_summary(sample_data)
     expected = pd.Series({'A': 1, 'B': 2, 'C': 1})
     pd.testing.assert_series_equal(result, expected)
 
 
-def test_drop_missing_rows(sample_data):
+def test_drop_missing_rows(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.drop_missing(sample_data, axis=0, how='all')
     expected = pd.DataFrame({
         'A': [1, 2, np.nan, 4],
@@ -40,7 +40,7 @@ def test_drop_missing_rows(sample_data):
     pd.testing.assert_frame_equal(result.reset_index(drop=True), expected)
 
 
-def test_drop_missing_columns(sample_data):
+def test_drop_missing_columns(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.drop_missing(sample_data, axis=1, how='all')
     expected = pd.DataFrame({
         'A': [1, 2, np.nan, 4],
@@ -50,7 +50,7 @@ def test_drop_missing_columns(sample_data):
     pd.testing.assert_frame_equal(result, expected)
 
 
-def test_fill_missing_mean(sample_data):
+def test_fill_missing_mean(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.fill_missing(sample_data, strategy='mean')
     expected = pd.DataFrame({
         'A': [1, 2, 2.333333, 4],   # Mean of [1, 2, 4] = 2.333333
@@ -60,7 +60,7 @@ def test_fill_missing_mean(sample_data):
     pd.testing.assert_frame_equal(result, expected)
 
 
-def test_fill_missing_constant(sample_data):
+def test_fill_missing_constant(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.fill_missing_constant(sample_data, fill_value=0)
     expected = pd.DataFrame({
         'A': [1.0, 2.0, 0.0, 4.0],
@@ -70,7 +70,7 @@ def test_fill_missing_constant(sample_data):
     pd.testing.assert_frame_equal(result, expected)
 
 
-def test_fill_missing_knn(sample_data):
+def test_fill_missing_knn(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.fill_missing_knn(sample_data, n_neighbors=2)
     expected = pd.DataFrame({
         'A': [1.0, 2.0, 3.0, 4.0],         # Use float64 instead of int64
@@ -80,13 +80,13 @@ def test_fill_missing_knn(sample_data):
     pd.testing.assert_frame_equal(result, expected, atol=1e-1)
 
 
-def test_fill_missing_iterative(sample_data):
+def test_fill_missing_iterative(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.fill_missing_iterative(sample_data)
     # The output will be an imputed DataFrame, which will vary slightly depending on the iterative imputation method.
     assert not result.isnull().values.any()  # Check that no NaN values remain
 
 
-def test_add_missing_indicator(sample_data):
+def test_add_missing_indicator(sample_data: pd.DataFrame) -> None:
     result = MissingValueHandler.add_missing_indicator(sample_data)
     expected = pd.DataFrame({
         'A': [1, 2, np.nan, 4],

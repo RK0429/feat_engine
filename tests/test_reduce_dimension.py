@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from feat_engine.dimensionality_reduction import DimensionalityReduction
+from feat_engine.reduce_dimension import DimensionReducer
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def sample_labels() -> pd.Series:
 
 def test_pca(sample_data: pd.DataFrame) -> None:
     """Test Principal Component Analysis (PCA)."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_pca = dr.pca(sample_data, n_components=2)
 
     # Verify the result shape
@@ -34,7 +34,7 @@ def test_pca(sample_data: pd.DataFrame) -> None:
 
 def test_lda(sample_data: pd.DataFrame, sample_labels: pd.Series) -> None:
     """Test Linear Discriminant Analysis (LDA)."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_lda = dr.lda(sample_data, sample_labels, n_components=1)
 
     # Verify the result shape
@@ -45,7 +45,7 @@ def test_lda(sample_data: pd.DataFrame, sample_labels: pd.Series) -> None:
 
 def test_svd(sample_data: pd.DataFrame) -> None:
     """Test Singular Value Decomposition (SVD)."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_svd = dr.svd(sample_data, n_components=2)
 
     # Verify the result shape
@@ -56,7 +56,7 @@ def test_svd(sample_data: pd.DataFrame) -> None:
 
 def test_tsne(sample_data: pd.DataFrame) -> None:
     """Test t-Distributed Stochastic Neighbor Embedding (t-SNE)."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_tsne = dr.tsne(sample_data, n_components=2, perplexity=2)  # Set perplexity < n_samples
     assert df_tsne.shape == (4, 2)
     assert not df_tsne.isnull().values.any()
@@ -64,7 +64,7 @@ def test_tsne(sample_data: pd.DataFrame) -> None:
 
 def test_umap(sample_data: pd.DataFrame) -> None:
     """Test Uniform Manifold Approximation and Projection (UMAP)."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_umap = dr.umap(sample_data, n_components=2)
 
     # Verify the result shape
@@ -75,7 +75,7 @@ def test_umap(sample_data: pd.DataFrame) -> None:
 
 def test_autoencoder(sample_data: pd.DataFrame) -> None:
     """Test Autoencoder dimensionality reduction."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_autoencoder = dr.autoencoder(sample_data, encoding_dim=2, epochs=50)
 
     # Verify the result shape
@@ -86,7 +86,7 @@ def test_autoencoder(sample_data: pd.DataFrame) -> None:
 
 def test_factor_analysis(sample_data: pd.DataFrame) -> None:
     """Test Factor Analysis."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_fa = dr.factor_analysis(sample_data, n_components=2)
 
     # Verify the result shape
@@ -97,7 +97,7 @@ def test_factor_analysis(sample_data: pd.DataFrame) -> None:
 
 def test_isomap(sample_data: pd.DataFrame) -> None:
     """Test Isomap."""
-    dr = DimensionalityReduction()
+    dr = DimensionReducer()
     df_isomap = dr.isomap(sample_data, n_components=2, n_neighbors=2)  # Set n_neighbors < n_samples
     assert df_isomap.shape == (4, 2)
     assert not df_isomap.isnull().values.any()

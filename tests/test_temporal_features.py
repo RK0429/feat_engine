@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from feat_engine.temporal_features import TemporalFeatureEngineering
+from feat_engine.temporal_features import TemporalFeatures
 
 
 @pytest.fixture
@@ -28,8 +28,8 @@ def test_convert_to_datetime(sample_data: pd.DataFrame) -> None:
     Asserts:
     - The column is correctly converted to datetime.
     """
-    tfe = TemporalFeatureEngineering()
-    df = tfe.convert_to_datetime(sample_data, 'date')
+    tf = TemporalFeatures()
+    df = tf.convert_to_datetime(sample_data, 'date')
     assert pd.api.types.is_datetime64_any_dtype(df['date'])
 
 
@@ -43,8 +43,8 @@ def test_extract_date_parts(sample_data: pd.DataFrame) -> None:
     Asserts:
     - The date parts (year, month, day, etc.) are correctly extracted.
     """
-    tfe = TemporalFeatureEngineering()
-    df = tfe.extract_date_parts(sample_data, 'date')
+    tf = TemporalFeatures()
+    df = tf.extract_date_parts(sample_data, 'date')
 
     assert 'year' in df.columns
     assert 'month' in df.columns
@@ -65,8 +65,8 @@ def test_create_lag_features(sample_data: pd.DataFrame) -> None:
     Asserts:
     - Lag features are correctly created for specified lags.
     """
-    tfe = TemporalFeatureEngineering()
-    df = tfe.create_lag_features(sample_data, 'value', [1, 2])
+    tf = TemporalFeatures()
+    df = tf.create_lag_features(sample_data, 'value', [1, 2])
 
     assert 'value_lag_1' in df.columns
     assert 'value_lag_2' in df.columns
@@ -82,8 +82,8 @@ def test_create_rolling_features(sample_data: pd.DataFrame) -> None:
     Asserts:
     - Rolling feature columns are correctly created.
     """
-    tfe = TemporalFeatureEngineering()
-    df = tfe.create_rolling_features(sample_data, 'value', window_size=2, feature='mean')
+    tf = TemporalFeatures()
+    df = tf.create_rolling_features(sample_data, 'value', window_size=2, feature='mean')
 
     assert 'value_rolling_mean_2' in df.columns
 
@@ -98,9 +98,9 @@ def test_cyclical_features(sample_data: pd.DataFrame) -> None:
     Asserts:
     - Cyclical features are created for time-related columns.
     """
-    tfe = TemporalFeatureEngineering()
-    df = tfe.extract_date_parts(sample_data, 'date')
-    df = tfe.cyclical_features(df, 'hour', max_value=24)
+    tf = TemporalFeatures()
+    df = tf.extract_date_parts(sample_data, 'date')
+    df = tf.cyclical_features(df, 'hour', max_value=24)
 
     assert 'hour_sin' in df.columns
     assert 'hour_cos' in df.columns
@@ -116,8 +116,8 @@ def test_resample_data(sample_data: pd.DataFrame) -> None:
     Asserts:
     - Data is correctly resampled and aggregated.
     """
-    tfe = TemporalFeatureEngineering()
-    df_resampled = tfe.resample_data(sample_data, 'date', rule='D', aggregation='sum')
+    tf = TemporalFeatures()
+    df_resampled = tf.resample_data(sample_data, 'date', rule='D', aggregation='sum')
 
     assert isinstance(df_resampled, pd.DataFrame)
     assert df_resampled.shape[0] == 3  # Expect 3 daily records
