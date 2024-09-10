@@ -26,6 +26,7 @@ tk = "^0.1.0"
 wheel = "^0.44.0"
 twine = "^5.1.1"
 sphinx-autobuild = "^2024.9.3"
+nbformat = "^5.10.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
