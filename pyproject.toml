@@ -23,6 +23,8 @@ seaborn = "^0.13.2"
 plotly = "^5.24.0"
 pytk = "^0.0.2.1"
 tk = "^0.1.0"
+wheel = "^0.44.0"
+twine = "^5.1.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
