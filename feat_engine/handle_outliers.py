@@ -83,8 +83,9 @@ class OutlierHandler:
         Returns:
             pd.Series: A boolean series indicating True for outliers.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-        outliers = dbscan.fit_predict(df)
+        outliers = dbscan.fit_predict(numeric_df)
         return pd.Series(outliers == -1, index=df.index)
 
     def robust_scaler(self, df: pd.DataFrame, lower_percentile: float = 0.01, upper_percentile: float = 0.99) -> pd.DataFrame:
