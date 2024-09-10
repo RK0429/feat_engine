@@ -10,6 +10,7 @@ from .handle_outliers import OutlierHandler
 from .temporal_features import TemporalFeatures
 from .group_features import FeatureGrouping
 from .target_based_features import TargetBasedFeatures
+from .visualize_data import DataVisualizer
 
 __all__ = [
     'MissingValueHandler',
@@ -21,5 +22,6 @@ __all__ = [
     'OutlierHandler',
     'TemporalFeatures',
     'FeatureGrouping',
-    'TargetBasedFeatures'
+    'TargetBasedFeatures',
+    'DataVisualizer'
 ]

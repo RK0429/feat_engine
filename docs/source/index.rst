@@ -6,11 +6,6 @@
 feat_engine documentation
 =========================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -25,3 +20,4 @@ documentation for details.
    temporal_features
    group_features
    target_based_features
+   visualize_data
