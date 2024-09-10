@@ -2,6 +2,8 @@ import pytest
 import pandas as pd
 import numpy as np
 from feat_engine.visualize_data import DataVisualizer
+import matplotlib
+matplotlib.use('Agg')
 
 
 @pytest.fixture
