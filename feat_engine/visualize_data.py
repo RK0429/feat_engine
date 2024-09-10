@@ -6,7 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-import umap
+import umap.umap_ as umap
 from typing import Union
 
 
