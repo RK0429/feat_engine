@@ -69,6 +69,35 @@ class DataVisualizer:
         plt.title("Correlation Heatmap")
         plt.show()
 
+    def plot_swarmplot(self, df: pd.DataFrame, x: str, y: str, hue: Union[str, None] = None) -> None:
+        """
+        Create a swarmplot to visualize the distribution of data points across different categories.
+
+        Args:
+        - df (pd.DataFrame): Input dataframe.
+        - x (str): The categorical feature to plot on the x-axis.
+        - y (str): The numerical feature to plot on the y-axis.
+        - hue (str, optional): Column name for adding a hue to the plot.
+        """
+        plt.figure(figsize=(10, 6))
+        sns.swarmplot(x=x, y=y, hue=hue, data=df)
+        plt.title(f'Swarmplot of {y} by {x}')
+        plt.show()
+
+    def plot_3d_scatter(self, df: pd.DataFrame, x: str, y: str, z: str, color: Union[str, None] = None) -> None:
+        """
+        Create a 3D scatter plot for visualizing relationships between three numerical features.
+
+        Args:
+        - df (pd.DataFrame): Input dataframe.
+        - x (str): X-axis column.
+        - y (str): Y-axis column.
+        - z (str): Z-axis column.
+        - color (str): Optional column for coloring the points.
+        """
+        fig = px.scatter_3d(df, x=x, y=y, z=z, color=color)
+        fig.show()
+
     # 2. Feature Interactions
     def plot_pairwise_relationships(self, df: pd.DataFrame, columns: list) -> None:
         """
@@ -270,6 +299,36 @@ class DataVisualizer:
         plt.show()
 
     # 9. Categorical Data Visualization
+    def plot_barplot(self, df: pd.DataFrame, x: str, y: str, hue: Union[str, None] = None) -> None:
+        """
+        Create a barplot for visualizing the aggregated values of a numerical feature across categories.
+
+        Args:
+        - df (pd.DataFrame): Input dataframe.
+        - x (str): The categorical feature to plot on the x-axis.
+        - y (str): The numerical feature to aggregate and plot on the y-axis.
+        - hue (str, optional): Column name for adding a hue to the plot.
+        """
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x=x, y=y, hue=hue, data=df)
+        plt.title(f'Barplot of {y} by {x}')
+        plt.show()
+
+    def plot_boxplot_categorical(self, df: pd.DataFrame, x: str, y: str, hue: Union[str, None] = None) -> None:
+        """
+        Create a boxplot to visualize the distribution of a numerical feature across different categories.
+
+        Args:
+        - df (pd.DataFrame): Input dataframe.
+        - x (str): The categorical feature to plot on the x-axis.
+        - y (str): The numerical feature to plot on the y-axis.
+        - hue (str, optional): Column name for adding a hue to the plot.
+        """
+        plt.figure(figsize=(10, 6))
+        sns.boxplot(x=x, y=y, hue=hue, data=df)
+        plt.title(f'Boxplot of {y} by {x}')
+        plt.show()
+
     def plot_categorical_distribution(self, df: pd.DataFrame, column: str, hue: Union[str, None] = None) -> None:
         """
         Plot the distribution of a categorical feature.
@@ -281,6 +340,21 @@ class DataVisualizer:
         plt.figure(figsize=(8, 6))
         sns.countplot(df, x=column, hue=hue)
         plt.title(f'Distribution of {column}')
+        plt.show()
+
+    def plot_categorical_heatmap(self, df: pd.DataFrame, col1: str, col2: str) -> None:
+        """
+        Create a heatmap to visualize the frequency of co-occurrences between two categorical features.
+
+        Args:
+        - df (pd.DataFrame): Input dataframe.
+        - col1 (str): Name of the first categorical column.
+        - col2 (str): Name of the second categorical column.
+        """
+        crosstab = pd.crosstab(df[col1], df[col2])
+        plt.figure(figsize=(10, 6))
+        sns.heatmap(crosstab, annot=True, cmap='Blues')
+        plt.title(f'Heatmap of {col1} vs {col2}')
         plt.show()
 
     # 10. Plot Target Distribution
