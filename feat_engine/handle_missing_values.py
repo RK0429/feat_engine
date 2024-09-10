@@ -55,21 +55,33 @@ class MissingValueHandler:
         return data.dropna(axis=axis, how=how)
 
     @staticmethod
-    def fill_missing(data: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+    def fill_missing(data: pd.DataFrame, strategy_num: str = 'mean', strategy_cat: str = 'most_frequent') -> pd.DataFrame:
         """
-        Fills missing values using a specified strategy, such as mean, median, or most frequent.
+        Fills missing values in the DataFrame using specified strategies for numerical and categorical columns.
 
         Args:
             data (pd.DataFrame): The input DataFrame.
-            strategy (str): The strategy to use for imputing missing values ('mean', 'median',
-                            'most_frequent', or 'constant').
+            strategy_num (str): The strategy to use for imputing missing values in numerical columns ('mean', 'median', 'most_frequent', or 'constant').
+            strategy_cat (str): The strategy to use for imputing missing values in categorical columns ('most_frequent' or 'constant').
 
         Returns:
             pd.DataFrame: The DataFrame with missing values filled according to the strategy.
         """
-        imputer = SimpleImputer(strategy=strategy)
-        filled_data = pd.DataFrame(imputer.fit_transform(data), columns=data.columns)
-        return filled_data
+        # Separate numerical and categorical columns
+        num_cols = data.select_dtypes(include=['number']).columns
+        cat_cols = data.select_dtypes(include=['object']).columns
+
+        # Impute missing values for numerical columns
+        if not num_cols.empty:
+            imputer_num = SimpleImputer(strategy=strategy_num)
+            data[num_cols] = pd.DataFrame(imputer_num.fit_transform(data[num_cols]), columns=num_cols)
+
+        # Impute missing values for categorical columns
+        if not cat_cols.empty:
+            imputer_cat = SimpleImputer(strategy=strategy_cat)
+            data[cat_cols] = pd.DataFrame(imputer_cat.fit_transform(data[cat_cols]), columns=cat_cols)
+
+        return data
 
     @staticmethod
     def fill_missing_constant(data: pd.DataFrame, fill_value: float | int | str) -> pd.DataFrame:
