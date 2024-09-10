@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from feat_engine.encoding_categorical import CategoricalEncoders
+from feat_engine.encoding_categorical import CategoricalEncoder
 from typing import Dict
 
 
@@ -16,7 +16,7 @@ def sample_data() -> pd.DataFrame:
 
 
 def test_label_encoding(sample_data: pd.DataFrame) -> None:
-    encoders = CategoricalEncoders()
+    encoders = CategoricalEncoder()
     df_encoded = encoders.label_encoding(sample_data, 'Category')
 
     # Check if the column has been created and properly encoded
@@ -25,7 +25,7 @@ def test_label_encoding(sample_data: pd.DataFrame) -> None:
 
 
 def test_one_hot_encoding(sample_data: pd.DataFrame) -> None:
-    encoders = CategoricalEncoders()
+    encoders = CategoricalEncoder()
     df_encoded = encoders.one_hot_encoding(sample_data, 'Color')
 
     # Check if the one-hot encoded columns exist
@@ -38,7 +38,7 @@ def test_one_hot_encoding(sample_data: pd.DataFrame) -> None:
 
 
 def test_ordinal_encoding(sample_data: pd.DataFrame) -> None:
-    encoders = CategoricalEncoders()
+    encoders = CategoricalEncoder()
     df_encoded = encoders.ordinal_encoding(sample_data, 'Category', categories=['low', 'medium', 'high'])
 
     # Check if the column has been created and encoded correctly
@@ -48,7 +48,7 @@ def test_ordinal_encoding(sample_data: pd.DataFrame) -> None:
 
 
 def test_binary_encoding(sample_data: pd.DataFrame) -> None:
-    encoders = CategoricalEncoders()
+    encoders = CategoricalEncoder()
     df_encoded = encoders.binary_encoding(sample_data, 'Color')
 
     # Check if binary encoded columns exist
@@ -60,7 +60,7 @@ def test_binary_encoding(sample_data: pd.DataFrame) -> None:
 
 
 def test_target_encoding(sample_data: pd.DataFrame) -> None:
-    encoders = CategoricalEncoders()
+    encoders = CategoricalEncoder()
     df_encoded = encoders.target_encoding(sample_data, 'Category', 'Target')
 
     # Check if the column has been created
@@ -71,7 +71,7 @@ def test_target_encoding(sample_data: pd.DataFrame) -> None:
 
 
 def test_frequency_encoding(sample_data: pd.DataFrame) -> None:
-    encoders = CategoricalEncoders()
+    encoders = CategoricalEncoder()
     df_encoded = encoders.frequency_encoding(sample_data, 'Color')
 
     # Check if the column has been created

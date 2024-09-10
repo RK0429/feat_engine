@@ -3,9 +3,9 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder, OrdinalEncoder
 import category_encoders as ce
 
 
-class CategoricalEncoders:
+class CategoricalEncoder:
     """
-    Class `CategoricalEncoders` provides various methods for encoding categorical variables.
+    Class `CategoricalEncoder` provides various methods for encoding categorical variables.
     """
 
     def __init__(self) -> None:
