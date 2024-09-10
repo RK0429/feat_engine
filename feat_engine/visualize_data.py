@@ -6,6 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+import umap
 from typing import Union
 
 
@@ -180,6 +181,31 @@ class DataVisualizer:
         plt.title('t-SNE Result')
         plt.xlabel('Component 1')
         plt.ylabel('Component 2')
+        plt.show()
+
+    def plot_umap(self, df: pd.DataFrame, n_components: int = 2, n_neighbors: int = 15, min_dist: float = 0.1) -> None:
+        """
+        Plot the results of UMAP dimensionality reduction.
+
+        Args:
+        - df (pd.DataFrame): Input dataframe.
+        - n_components (int): Number of components to reduce to.
+        - n_neighbors (int): The size of the local neighborhood (in terms of number of neighboring points).
+        - min_dist (float): Minimum distance between points in the low-dimensional space.
+        """
+        # Select only numeric columns
+        numeric_df = df.select_dtypes(include=[np.number])
+
+        # UMAP model
+        umap_model = umap.UMAP(n_components=n_components, n_neighbors=n_neighbors, min_dist=min_dist)
+        umap_result = umap_model.fit_transform(numeric_df)
+
+        # Plot UMAP result
+        plt.figure(figsize=(8, 6))
+        plt.scatter(umap_result[:, 0], umap_result[:, 1], c='g')
+        plt.title('UMAP Result')
+        plt.xlabel('UMAP1')
+        plt.ylabel('UMAP2')
         plt.show()
 
     # 6. Interactive Visualizations using Plotly
