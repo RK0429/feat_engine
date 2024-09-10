@@ -151,8 +151,10 @@ class DataVisualizer:
         - df (pd.DataFrame): Input dataframe.
         - n_components (int): Number of components to reduce to.
         """
+        # Select only numeric columns
+        numeric_df = df.select_dtypes(include=[np.number])
         pca = PCA(n_components=n_components)
-        pca_result = pca.fit_transform(df)
+        pca_result = pca.fit_transform(numeric_df)
         plt.figure(figsize=(8, 6))
         plt.scatter(pca_result[:, 0], pca_result[:, 1], c='b')
         plt.title('PCA Result')
@@ -169,8 +171,10 @@ class DataVisualizer:
         - n_components (int): Number of components to reduce to.
         - perplexity (int): Perplexity parameter for t-SNE.
         """
+        # Select only numeric columns
+        numeric_df = df.select_dtypes(include=[np.number])
         tsne = TSNE(n_components=n_components, perplexity=perplexity)
-        tsne_result = tsne.fit_transform(df)
+        tsne_result = tsne.fit_transform(numeric_df)
         plt.figure(figsize=(8, 6))
         plt.scatter(tsne_result[:, 0], tsne_result[:, 1], c='r')
         plt.title('t-SNE Result')
