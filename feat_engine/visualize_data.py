@@ -240,7 +240,7 @@ class DataVisualizer:
         plt.show()
 
     # 9. Categorical Data Visualization
-    def plot_categorical_distribution(self, df: pd.DataFrame, column: str) -> None:
+    def plot_categorical_distribution(self, df: pd.DataFrame, column: str, hue: Union[str, None] = None) -> None:
         """
         Plot the distribution of a categorical feature.
 
@@ -249,7 +249,7 @@ class DataVisualizer:
         - column (str): Name of the categorical column.
         """
         plt.figure(figsize=(8, 6))
-        sns.countplot(df, x=column)
+        sns.countplot(df, x=column, hue=hue)
         plt.title(f'Distribution of {column}')
         plt.show()
 
