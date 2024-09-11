@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import (
     MinMaxScaler,
     StandardScaler,
@@ -51,7 +52,7 @@ class ScalingNormalizer:
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'ScalingNormalizer':
         """
-        Fits the scaler or normalizer to the input data.
+        Fits the scaler or normalizer to the numeric columns of the input data.
 
         Args:
             X (pd.DataFrame): The input data to be scaled or normalized.
@@ -60,39 +61,46 @@ class ScalingNormalizer:
         Returns:
             ScalingNormalizer: Returns the instance of the class after fitting.
         """
-        self.scaler.fit(X, y)
+        numeric_X = X.select_dtypes(include=[np.number])
+        self.scaler.fit(numeric_X, y)
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Transforms the input data using the fitted scaler or normalizer.
+        Transforms the numeric columns of the input data using the fitted scaler or normalizer.
 
         Args:
             X (pd.DataFrame): The input data to transform.
 
         Returns:
-            pd.DataFrame: Transformed data in the form of a DataFrame.
+            pd.DataFrame: Transformed data in the form of a DataFrame, with non-numeric columns unchanged.
         """
-        transformed = self.scaler.transform(X)
-        if isinstance(X, pd.DataFrame):
-            return pd.DataFrame(transformed, columns=X.columns, index=X.index)
-        return pd.DataFrame(transformed)
+        numeric_X = X.select_dtypes(include=[np.number])
+        transformed_numeric = self.scaler.transform(numeric_X)
+
+        # Replace the numeric columns with the transformed values
+        transformed_df = X.copy()
+        transformed_df[numeric_X.columns] = transformed_numeric
+        return transformed_df
 
     def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
         """
-        Fits the scaler or normalizer to the data and transforms it.
+        Fits the scaler or normalizer to the numeric columns of the data and transforms it.
 
         Args:
             X (pd.DataFrame): The input data to scale or normalize.
             y (Optional[pd.Series]): Not used in the scaling process, provided for compatibility.
 
         Returns:
-            pd.DataFrame: The transformed data in the form of a DataFrame.
+            pd.DataFrame: The transformed data in the form of a DataFrame, with non-numeric columns unchanged.
         """
-        transformed = self.scaler.fit_transform(X, y)
-        if isinstance(X, pd.DataFrame):
-            return pd.DataFrame(transformed, columns=X.columns, index=X.index)
-        return pd.DataFrame(transformed)
+        numeric_X = X.select_dtypes(include=[np.number])
+        transformed_numeric = self.scaler.fit_transform(numeric_X, y)
+
+        # Replace the numeric columns with the transformed values
+        transformed_df = X.copy()
+        transformed_df[numeric_X.columns] = transformed_numeric
+        return transformed_df
 
     @staticmethod
     def create_column_transformer(column_methods: Dict[str, str]) -> ColumnTransformer:

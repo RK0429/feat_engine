@@ -6,7 +6,7 @@ authors = ["Ryota Kobayashi <s.woods.m.29@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.9,<3.12"
 setuptools = "^74.1.2"
 scikit-learn = "^1.5.1"
 pytest = "^8.3.2"
