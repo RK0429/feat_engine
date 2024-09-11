@@ -3,6 +3,7 @@ from sklearn.decomposition import PCA, TruncatedSVD, FactorAnalysis
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.manifold import TSNE, Isomap
 import umap.umap_ as umap  # Correct import
+import numpy as np
 from keras.layers import Input, Dense
 from keras.models import Model
 
@@ -35,8 +36,9 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The transformed dataframe with reduced dimensionality.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         pca = PCA(n_components=n_components)
-        pca_result = pca.fit_transform(df)
+        pca_result = pca.fit_transform(numeric_df)
         return pd.DataFrame(pca_result)
 
     def lda(self, df: pd.DataFrame, labels: pd.Series, n_components: int) -> pd.DataFrame:
@@ -54,8 +56,9 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The transformed dataframe with reduced dimensionality.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         lda = LDA(n_components=n_components)
-        lda_result = lda.fit_transform(df, labels)
+        lda_result = lda.fit_transform(numeric_df, labels)
         return pd.DataFrame(lda_result)
 
     def svd(self, df: pd.DataFrame, n_components: int) -> pd.DataFrame:
@@ -72,8 +75,9 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The transformed dataframe with reduced dimensionality.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         svd = TruncatedSVD(n_components=n_components)
-        svd_result = svd.fit_transform(df)
+        svd_result = svd.fit_transform(numeric_df)
         return pd.DataFrame(svd_result)
 
     def factor_analysis(self, df: pd.DataFrame, n_components: int) -> pd.DataFrame:
@@ -90,8 +94,9 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The transformed dataframe with reduced dimensionality.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         fa = FactorAnalysis(n_components=n_components)
-        fa_result = fa.fit_transform(df)
+        fa_result = fa.fit_transform(numeric_df)
         return pd.DataFrame(fa_result)
 
     def tsne(self, df: pd.DataFrame, n_components: int = 2, perplexity: int = 30) -> pd.DataFrame:
@@ -109,8 +114,9 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The transformed dataframe with reduced dimensionality.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         tsne = TSNE(n_components=n_components, perplexity=perplexity)
-        tsne_result = tsne.fit_transform(df)
+        tsne_result = tsne.fit_transform(numeric_df)
         return pd.DataFrame(tsne_result)
 
     def umap(self, df: pd.DataFrame, n_components: int = 2) -> pd.DataFrame:
@@ -127,8 +133,9 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The transformed dataframe with reduced dimensionality.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         reducer = umap.UMAP(n_components=n_components)
-        umap_result = reducer.fit_transform(df)
+        umap_result = reducer.fit_transform(numeric_df)
         return pd.DataFrame(umap_result)
 
     def isomap(self, df: pd.DataFrame, n_components: int = 2, n_neighbors: int = 2) -> pd.DataFrame:
@@ -145,8 +152,9 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The transformed dataframe with reduced dimensionality.
         """
+        numeric_df = df.select_dtypes(include=[np.number])
         isomap = Isomap(n_components=n_components, n_neighbors=n_neighbors)
-        isomap_result = isomap.fit_transform(df)
+        isomap_result = isomap.fit_transform(numeric_df)
         return pd.DataFrame(isomap_result, index=df.index)
 
     def autoencoder(self, df: pd.DataFrame, encoding_dim: int = 10, epochs: int = 50, batch_size: int = 10) -> pd.DataFrame:
@@ -165,7 +173,8 @@ class DimensionReducer:
         Returns:
             pd.DataFrame: The reduced representation of the data learned by the autoencoder.
         """
-        input_dim = df.shape[1]
+        numeric_df = df.select_dtypes(include=[np.number])
+        input_dim = numeric_df.shape[1]
         input_layer = Input(shape=(input_dim,))
         encoded = Dense(encoding_dim, activation='relu')(input_layer)
         decoded = Dense(input_dim, activation='sigmoid')(encoded)
@@ -174,9 +183,9 @@ class DimensionReducer:
         autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
 
         # Train the autoencoder
-        autoencoder.fit(df, df, epochs=epochs, batch_size=batch_size, verbose=0)
+        autoencoder.fit(numeric_df, numeric_df, epochs=epochs, batch_size=batch_size, verbose=0)
 
         # Get the encoded representation
         encoder = Model(input_layer, encoded)
-        encoded_data = encoder.predict(df)
+        encoded_data = encoder.predict(numeric_df)
         return pd.DataFrame(encoded_data)
