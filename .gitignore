@@ -26,7 +26,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-catboost_info/
+catboost_info
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
