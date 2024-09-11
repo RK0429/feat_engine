@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.experimental import enable_iterative_imputer  # Enable the experimental API
 from sklearn.impute import IterativeImputer
+from sklearn.preprocessing import LabelEncoder
 
 
 class MissingValueHandler:
@@ -55,32 +56,64 @@ class MissingValueHandler:
         return data.dropna(axis=axis, how=how)
 
     @staticmethod
-    def fill_missing(data: pd.DataFrame, strategy_num: str = 'mean', strategy_cat: str = 'most_frequent') -> pd.DataFrame:
+    def drop_missing_threshold(data: pd.DataFrame, threshold: float = 0.5, axis: int = 0) -> pd.DataFrame:
+        """
+        Drops rows or columns with missing values that exceed a specified threshold.
+
+        Args:
+            data (pd.DataFrame): The input DataFrame.
+            threshold (float): The proportion of allowed missing values before dropping. Default is 0.5.
+            axis (int): Specifies whether to drop rows (0) or columns (1). Default is 0 (drop rows).
+
+        Returns:
+            pd.DataFrame: The DataFrame with rows or columns dropped based on the missing value threshold.
+        """
+        return data.dropna(thresh=int((1 - threshold) * data.shape[axis]), axis=axis)
+
+    @staticmethod
+    def fill_missing(data: pd.DataFrame, strategy_num: str = 'mean', strategy_cat: str = 'most_frequent', knn: bool = False, n_neighbors: int = 5) -> pd.DataFrame:
         """
         Fills missing values in the DataFrame using specified strategies for numerical and categorical columns.
+        Optionally applies KNN imputation for both numerical and categorical data.
 
         Args:
             data (pd.DataFrame): The input DataFrame.
             strategy_num (str): The strategy to use for imputing missing values in numerical columns ('mean', 'median', 'most_frequent', or 'constant').
             strategy_cat (str): The strategy to use for imputing missing values in categorical columns ('most_frequent' or 'constant').
+            knn (bool): Whether to use KNN imputation for both numerical and categorical columns. Default is False.
+            n_neighbors (int): The number of neighboring samples to use for KNN imputation if knn is True.
 
         Returns:
-            pd.DataFrame: The DataFrame with missing values filled according to the strategy.
+            pd.DataFrame: The DataFrame with missing values filled according to the strategy or KNN imputation.
         """
         # Separate numerical and categorical columns
         num_cols = data.select_dtypes(include=['number']).columns
         cat_cols = data.select_dtypes(include=['object']).columns
         filled_data = data.copy()
 
-        # Impute missing values for numerical columns
-        if not num_cols.empty:
-            imputer_num = SimpleImputer(strategy=strategy_num)
-            filled_data[num_cols] = pd.DataFrame(imputer_num.fit_transform(data[num_cols]), columns=num_cols)
+        if knn:
+            # Handle KNN imputation for both numerical and categorical columns
+            if not cat_cols.empty:
+                encoders = {col: LabelEncoder() for col in cat_cols}
+                for col in cat_cols:
+                    filled_data[col] = encoders[col].fit_transform(filled_data[col].astype(str))
 
-        # Impute missing values for categorical columns
-        if not cat_cols.empty:
-            imputer_cat = SimpleImputer(strategy=strategy_cat)
-            filled_data[cat_cols] = pd.DataFrame(imputer_cat.fit_transform(data[cat_cols]), columns=cat_cols)
+            imputer_knn = KNNImputer(n_neighbors=n_neighbors)
+            filled_data = pd.DataFrame(imputer_knn.fit_transform(filled_data), columns=data.columns)
+
+            if not cat_cols.empty:
+                for col in cat_cols:
+                    filled_data[col] = encoders[col].inverse_transform(filled_data[col].astype(int))
+        else:
+            # Impute missing values for numerical columns
+            if not num_cols.empty:
+                imputer_num = SimpleImputer(strategy=strategy_num)
+                filled_data[num_cols] = pd.DataFrame(imputer_num.fit_transform(data[num_cols]), columns=num_cols)
+
+            # Impute missing values for categorical columns
+            if not cat_cols.empty:
+                imputer_cat = SimpleImputer(strategy=strategy_cat)
+                filled_data[cat_cols] = pd.DataFrame(imputer_cat.fit_transform(data[cat_cols]), columns=cat_cols)
 
         return filled_data
 
