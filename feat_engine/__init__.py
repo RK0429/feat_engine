@@ -11,6 +11,7 @@ from .temporal_features import TemporalFeatures
 from .group_features import FeatureGrouping
 from .target_based_features import TargetBasedFeatures
 from .visualize_data import DataVisualizer
+from .solve_classification import ClassificationSolver
 
 __all__ = [
     'MissingValueHandler',
@@ -23,5 +24,6 @@ __all__ = [
     'TemporalFeatures',
     'FeatureGrouping',
     'TargetBasedFeatures',
-    'DataVisualizer'
+    'DataVisualizer',
+    'ClassificationSolver'
 ]
