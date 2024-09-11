@@ -70,18 +70,19 @@ class MissingValueHandler:
         # Separate numerical and categorical columns
         num_cols = data.select_dtypes(include=['number']).columns
         cat_cols = data.select_dtypes(include=['object']).columns
+        filled_data = data.copy()
 
         # Impute missing values for numerical columns
         if not num_cols.empty:
             imputer_num = SimpleImputer(strategy=strategy_num)
-            data[num_cols] = pd.DataFrame(imputer_num.fit_transform(data[num_cols]), columns=num_cols)
+            filled_data[num_cols] = pd.DataFrame(imputer_num.fit_transform(data[num_cols]), columns=num_cols)
 
         # Impute missing values for categorical columns
         if not cat_cols.empty:
             imputer_cat = SimpleImputer(strategy=strategy_cat)
-            data[cat_cols] = pd.DataFrame(imputer_cat.fit_transform(data[cat_cols]), columns=cat_cols)
+            filled_data[cat_cols] = pd.DataFrame(imputer_cat.fit_transform(data[cat_cols]), columns=cat_cols)
 
-        return data
+        return filled_data
 
     @staticmethod
     def fill_missing_constant(data: pd.DataFrame, fill_value: float | int | str) -> pd.DataFrame:
