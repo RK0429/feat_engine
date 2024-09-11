@@ -244,7 +244,7 @@ class DataVisualizer:
         Args:
             df (pd.DataFrame): The input dataframe containing the features.
             cluster_labels (pd.Series): The cluster labels for each data point.
-            method (str): The dimensionality reduction method ('pca', 'umap', or 'tsne'). Default is 'pca'.
+            method (str): The dimensionality reduction method ('pca', 'umap', 'tsne', or 'identity'). Default is 'pca'.
             n_components (int): Number of dimensions to reduce to (default: 2).
 
         Returns:
@@ -252,15 +252,18 @@ class DataVisualizer:
         """
         if method == 'pca':
             reducer = PCA(n_components=n_components)
+            reduced_data = reducer.fit_transform(df.select_dtypes(include=[np.number]))
         elif method == 'umap':
             reducer = umap.UMAP(n_components=n_components)
+            reduced_data = reducer.fit_transform(df.select_dtypes(include=[np.number]))
         elif method == 'tsne':
             reducer = TSNE(n_components=n_components)
+            reduced_data = reducer.fit_transform(df.select_dtypes(include=[np.number]))
+        elif method == 'identity':
+            # Identity function: no dimensionality reduction, use original data
+            reduced_data = df.select_dtypes(include=[np.number]).values
         else:
             raise ValueError(f"Unsupported dimensionality reduction method: {method}")
-
-        # Perform dimensionality reduction
-        reduced_data = reducer.fit_transform(df.select_dtypes(include=[np.number]))
 
         # Create a scatter plot with clusters color-coded
         plt.figure(figsize=(10, 6))
