@@ -267,7 +267,7 @@ class DataVisualizer:
 
         # Create a scatter plot with clusters color-coded
         plt.figure(figsize=(10, 6))
-        scatter = plt.scatter(reduced_data[:, 0], reduced_data[:, 1], c=cluster_labels, cmap='tab10', s=50, edgecolor='k')
+        scatter = plt.scatter(reduced_data[:, 0], reduced_data[:, 1], c=cluster_labels, cmap='tab20', s=50, edgecolor='k')
         plt.title(f'Clusters Visualized using {method.upper()}')
         plt.xlabel(f'{method.upper()} 1')
         plt.ylabel(f'{method.upper()} 2')
