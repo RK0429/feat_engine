@@ -14,7 +14,7 @@ from typing import Optional, Any, Dict
 class ScalingNormalizer:
     """
     A utility class for scaling and normalizing data using various methods such as Min-Max scaling, standard scaling,
-    robust scaling, max absolute scaling, and L2 normalization.
+    robust scaling, max absolute scaling, and L2 normalization. Non-numeric columns are left unchanged.
     """
 
     def __init__(self, method: str = 'standard', **kwargs: Any):
@@ -62,6 +62,8 @@ class ScalingNormalizer:
             ScalingNormalizer: Returns the instance of the class after fitting.
         """
         numeric_X = X.select_dtypes(include=[np.number])
+        if numeric_X.empty:
+            raise ValueError("No numeric columns found in the DataFrame.")
         self.scaler.fit(numeric_X, y)
         return self
 
@@ -95,6 +97,8 @@ class ScalingNormalizer:
             pd.DataFrame: The transformed data in the form of a DataFrame, with non-numeric columns unchanged.
         """
         numeric_X = X.select_dtypes(include=[np.number])
+        if numeric_X.empty:
+            raise ValueError("No numeric columns found in the DataFrame.")
         transformed_numeric = self.scaler.fit_transform(numeric_X, y)
 
         # Replace the numeric columns with the transformed values
