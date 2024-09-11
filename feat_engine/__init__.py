@@ -12,6 +12,7 @@ from .group_features import FeatureGrouping
 from .target_based_features import TargetBasedFeatures
 from .visualize_data import DataVisualizer
 from .solve_classification import ClassificationSolver
+from .solve_regression import RegressionSolver
 
 __all__ = [
     'MissingValueHandler',
@@ -25,5 +26,6 @@ __all__ = [
     'FeatureGrouping',
     'TargetBasedFeatures',
     'DataVisualizer',
-    'ClassificationSolver'
+    'ClassificationSolver',
+    'RegressionSolver'
 ]
