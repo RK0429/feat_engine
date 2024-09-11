@@ -21,3 +21,4 @@ feat_engine documentation
    group_features
    target_based_features
    visualize_data
+   solve_classification
