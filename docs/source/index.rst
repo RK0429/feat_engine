@@ -22,3 +22,4 @@ feat_engine documentation
    target_based_features
    visualize_data
    solve_classification
+   solve_regression
