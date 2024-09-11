@@ -237,6 +237,40 @@ class DataVisualizer:
         plt.ylabel('UMAP2')
         plt.show()
 
+    def plot_clusters(self, df: pd.DataFrame, cluster_labels: pd.Series, method: str = 'pca', n_components: int = 2) -> None:
+        """
+        Plot data points color-coded by cluster labels using dimensionality reduction.
+
+        Args:
+            df (pd.DataFrame): The input dataframe containing the features.
+            cluster_labels (pd.Series): The cluster labels for each data point.
+            method (str): The dimensionality reduction method ('pca', 'umap', or 'tsne'). Default is 'pca'.
+            n_components (int): Number of dimensions to reduce to (default: 2).
+
+        Returns:
+            None: Displays the color-coded cluster plot.
+        """
+        if method == 'pca':
+            reducer = PCA(n_components=n_components)
+        elif method == 'umap':
+            reducer = umap.UMAP(n_components=n_components)
+        elif method == 'tsne':
+            reducer = TSNE(n_components=n_components)
+        else:
+            raise ValueError(f"Unsupported dimensionality reduction method: {method}")
+
+        # Perform dimensionality reduction
+        reduced_data = reducer.fit_transform(df.select_dtypes(include=[np.number]))
+
+        # Create a scatter plot with clusters color-coded
+        plt.figure(figsize=(10, 6))
+        scatter = plt.scatter(reduced_data[:, 0], reduced_data[:, 1], c=cluster_labels, cmap='tab10', s=50, edgecolor='k')
+        plt.title(f'Clusters Visualized using {method.upper()}')
+        plt.xlabel(f'{method.upper()} 1')
+        plt.ylabel(f'{method.upper()} 2')
+        plt.colorbar(scatter, label='Cluster')
+        plt.show()
+
     # 6. Interactive Visualizations using Plotly
     def plot_interactive_histogram(self, df: pd.DataFrame, column: str) -> None:
         """

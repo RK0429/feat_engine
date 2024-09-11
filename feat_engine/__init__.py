@@ -6,6 +6,7 @@ from .encode_category import CategoricalEncoder
 from .interact_features import FeatureInteraction
 from .transform_features import FeatureTransformer
 from .reduce_dimension import DimensionReducer
+from .cluster_data import DataClustering
 from .handle_outliers import OutlierHandler
 from .temporal_features import TemporalFeatures
 from .group_features import FeatureGrouping
@@ -21,6 +22,7 @@ __all__ = [
     'FeatureInteraction',
     'FeatureTransformer',
     'DimensionReducer',
+    'DataClustering',
     'OutlierHandler',
     'TemporalFeatures',
     'FeatureGrouping',
