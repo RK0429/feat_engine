@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.metrics import (
-    classification_report, confusion_matrix, accuracy_score,
-    roc_auc_score, roc_curve, precision_score, recall_score, f1_score
+    confusion_matrix, accuracy_score, roc_auc_score,
+    roc_curve, precision_score, recall_score, f1_score
 )
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -19,6 +19,7 @@ from imblearn.under_sampling import RandomUnderSampler
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+import logging
 from typing import List, Tuple, Dict, Any, Union
 
 
@@ -28,34 +29,56 @@ class ClassificationSolver:
     Includes methods for data preprocessing, model training, evaluation, hyperparameter tuning,
     cross-validation, and model persistence.
     """
-
-    def __init__(self, models: Union[Dict[str, Any], None] = None):
+    def __init__(self, models: Union[Dict[str, Any], None] = None) -> None:
         """
         Initializes the ClassificationSolver with a dictionary of models to use.
 
         Args:
             models (Dict[str, Any]): A dictionary mapping model names to model instances.
         """
-        if models is None:
-            self.models = {
-                'Logistic Regression': LogisticRegression(),
-                'Random Forest': RandomForestClassifier(),
-                'Gradient Boosting': GradientBoostingClassifier(),
-                'Support Vector Machine': SVC(probability=True),
-                'K-Nearest Neighbors': KNeighborsClassifier(),
-                'Decision Tree': DecisionTreeClassifier(),
-                'XGBoost': XGBClassifier(),
-                'LightGBM': LGBMClassifier(),
-                'CatBoost': CatBoostClassifier(verbose=0),
-                'Naive Bayes': GaussianNB(),
-                'Voting Classifier': VotingClassifier(estimators=[
-                    ('lr', LogisticRegression()),
-                    ('rf', RandomForestClassifier()),
-                    ('svc', SVC(probability=True))
-                ], voting='soft')
-            }
-        else:
-            self.models = models
+        self.logger = self.setup_logger()
+        self.models = models or self.default_models()
+
+    def default_models(self) -> Dict[str, Any]:
+        """
+        Provides default models for classification tasks.
+
+        Returns:
+            Dict[str, Any]: A dictionary of default models.
+        """
+        return {
+            'Logistic Regression': LogisticRegression(),
+            'Random Forest': RandomForestClassifier(),
+            'Gradient Boosting': GradientBoostingClassifier(),
+            'Support Vector Machine': SVC(probability=True),
+            'K-Nearest Neighbors': KNeighborsClassifier(),
+            'Decision Tree': DecisionTreeClassifier(),
+            'XGBoost': XGBClassifier(),
+            'LightGBM': LGBMClassifier(),
+            'CatBoost': CatBoostClassifier(verbose=0),
+            'Naive Bayes': GaussianNB(),
+            'Voting Classifier': VotingClassifier(estimators=[
+                ('lr', LogisticRegression()),
+                ('rf', RandomForestClassifier()),
+                ('svc', SVC(probability=True))
+            ], voting='soft')
+        }
+
+    @staticmethod
+    def setup_logger() -> logging.Logger:
+        """
+        Sets up a logger for tracking model training and evaluation.
+
+        Returns:
+            logging.Logger: Configured logger instance.
+        """
+        logger = logging.getLogger('ClassificationSolver')
+        logger.setLevel(logging.INFO)
+        ch = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+        return logger
 
     def handle_class_imbalance(self, X: pd.DataFrame, y: pd.Series, strategy: str = 'oversample') -> Tuple[pd.DataFrame, pd.Series]:
         """
@@ -70,9 +93,11 @@ class ClassificationSolver:
             Tuple[pd.DataFrame, pd.Series]: Balanced features and target.
         """
         if strategy == 'oversample':
+            self.logger.info("Applying SMOTE oversampling...")
             oversample = SMOTE()
             X_balanced, y_balanced = oversample.fit_resample(X, y)
         elif strategy == 'undersample':
+            self.logger.info("Applying undersampling...")
             undersample = RandomUnderSampler()
             X_balanced, y_balanced = undersample.fit_resample(X, y)
         else:
@@ -93,6 +118,7 @@ class ClassificationSolver:
         Returns:
             Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]: Training and testing sets for features and target.
         """
+        self.logger.info("Splitting data into training and testing sets...")
         return train_test_split(X, y, test_size=test_size, random_state=random_state)
 
     def train_model(self, model_name: str, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
@@ -108,6 +134,7 @@ class ClassificationSolver:
             Any: The trained model.
         """
         model = self.models[model_name]
+        self.logger.info(f"Training model: {model_name}...")
         model.fit(X_train, y_train)
         return model
 
@@ -121,18 +148,32 @@ class ClassificationSolver:
             y_test (pd.Series): Testing target.
 
         Returns:
-            Dict[str, Any]: A dictionary containing evaluation metrics (accuracy, precision, recall, F1 score, ROC AUC, confusion matrix).
+            Dict[str, Any]: A dictionary containing evaluation metrics.
         """
+        self.logger.info("Evaluating model performance...")
         predictions = model.predict(X_test)
         probabilities = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else None
 
+        return self.get_evaluation_metrics(y_test, predictions, probabilities)
+
+    def get_evaluation_metrics(self, y_test: pd.Series, predictions: np.ndarray, probabilities: np.ndarray) -> Dict[str, Any]:
+        """
+        Computes evaluation metrics for the model.
+
+        Args:
+            y_test (pd.Series): True labels.
+            predictions (np.ndarray): Model predictions.
+            probabilities (np.ndarray): Model predicted probabilities.
+
+        Returns:
+            Dict[str, Any]: Dictionary of evaluation metrics.
+        """
+        self.logger.info("Computing evaluation metrics...")
         accuracy = accuracy_score(y_test, predictions)
         precision = precision_score(y_test, predictions, average='weighted')
         recall = recall_score(y_test, predictions, average='weighted')
         f1 = f1_score(y_test, predictions, average='weighted')
         roc_auc = roc_auc_score(y_test, probabilities) if probabilities is not None else None
-
-        class_report = classification_report(y_test, predictions, output_dict=True)
         conf_matrix = confusion_matrix(y_test, predictions)
 
         return {
@@ -141,7 +182,6 @@ class ClassificationSolver:
             'recall': recall,
             'f1_score': f1,
             'roc_auc': roc_auc,
-            'classification_report': class_report,
             'confusion_matrix': conf_matrix
         }
 
@@ -160,8 +200,10 @@ class ClassificationSolver:
             Any: The best estimator found by GridSearchCV.
         """
         model = self.models[model_name]
+        self.logger.info(f"Performing hyperparameter tuning for {model_name}...")
         grid_search = GridSearchCV(model, param_grid, cv=cv, scoring='accuracy')
         grid_search.fit(X_train, y_train)
+        self.logger.info(f"Best parameters found for {model_name}: {grid_search.best_params_}")
         return grid_search.best_estimator_
 
     def auto_select_best_model(self, X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series) -> str:
@@ -177,14 +219,17 @@ class ClassificationSolver:
         Returns:
             str: The name of the best performing model.
         """
+        self.logger.info("Automatically selecting the best model based on accuracy...")
         best_score = 0
         best_model_name = ""
         for model_name in self.models:
+            self.logger.info(f"Training and evaluating model: {model_name}")
             model = self.train_model(model_name, X_train, y_train)
             score = self.evaluate_model(model, X_test, y_test)['accuracy']
             if score > best_score:
                 best_score = score
                 best_model_name = model_name
+        self.logger.info(f"Best model selected: {best_model_name} with accuracy: {best_score}")
         return best_model_name
 
     def plot_confusion_matrix(self, conf_matrix: np.ndarray, class_names: List[str]) -> None:
@@ -215,7 +260,7 @@ class ClassificationSolver:
             probabilities = model.predict_proba(X_test)[:, 1]
         else:
             probabilities = model.decision_function(X_test)
-        fpr, tpr, thresholds = roc_curve(y_test, probabilities)
+        fpr, tpr, _ = roc_curve(y_test, probabilities)
         plt.figure(figsize=(8, 6))
         plt.plot(fpr, tpr, color='blue', label=f'ROC Curve (AUC = {roc_auc_score(y_test, probabilities):.2f})')
         plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
@@ -239,6 +284,7 @@ class ClassificationSolver:
             Dict[str, float]: Cross-validation scores (mean and standard deviation of accuracy).
         """
         model = self.models[model_name]
+        self.logger.info(f"Cross-validating model: {model_name}")
         scores = cross_val_score(model, X, y, cv=cv, scoring='accuracy')
         return {
             'mean_accuracy': float(np.mean(scores)),
@@ -263,7 +309,7 @@ class ClassificationSolver:
             plt.tight_layout()
             plt.show()
         else:
-            print("Model does not have feature importances.")
+            self.logger.warning("Model does not have feature importances.")
 
     def save_model(self, model: Any, filename: str) -> None:
         """
@@ -274,7 +320,7 @@ class ClassificationSolver:
             filename (str): The path and filename to save the model.
         """
         joblib.dump(model, filename)
-        print(f"Model saved to {filename}")
+        self.logger.info(f"Model saved to {filename}")
 
     def load_model(self, filename: str) -> Any:
         """
@@ -287,5 +333,5 @@ class ClassificationSolver:
             Any: The loaded model.
         """
         model = joblib.load(filename)
-        print(f"Model loaded from {filename}")
+        self.logger.info(f"Model loaded from {filename}")
         return model
