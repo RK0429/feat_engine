@@ -1,5 +1,6 @@
 # feat_engine/__init__.py
 
+from .operate_dataframe import DataFrameOperator
 from .handle_missing_values import MissingValueHandler
 from .normalize_scaling import ScalingNormalizer
 from .encode_category import CategoricalEncoder
@@ -16,6 +17,7 @@ from .solve_classification import ClassificationSolver
 from .solve_regression import RegressionSolver
 
 __all__ = [
+    'DataFrameOperator',
     'MissingValueHandler',
     'ScalingNormalizer',
     'CategoricalEncoder',
