@@ -1,6 +1,7 @@
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, OrdinalEncoder
 import category_encoders as ce
+from typing import List
 
 
 class CategoricalEncoder:
@@ -19,103 +20,110 @@ class CategoricalEncoder:
         """
         self.encoders: dict = {}
 
-    def label_encoding(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+    def label_encoding(self, df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
         """
-        Applies label encoding to a specified column, transforming categorical values into integer labels.
+        Applies label encoding to the specified columns, transforming categorical values into integer labels.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the column to be encoded.
-            column (str): The name of the column to apply label encoding.
+            df (pd.DataFrame): Input DataFrame containing the columns to be encoded.
+            columns (List[str]): List of column names to apply label encoding.
 
         Returns:
-            pd.DataFrame: The DataFrame with the encoded column appended as '{column}_encoded'.
+            pd.DataFrame: The DataFrame with the encoded columns appended as '{column}_encoded'.
         """
-        le = LabelEncoder()
-        df[f"{column}_encoded"] = le.fit_transform(df[column])
-        self.encoders[column] = le
+        for column in columns:
+            le = LabelEncoder()
+            df[f"{column}_encoded"] = le.fit_transform(df[column])
+            self.encoders[column] = le
         return df
 
-    def one_hot_encoding(self, df: pd.DataFrame, column: str, drop_first: bool = False) -> pd.DataFrame:
+    def one_hot_encoding(self, df: pd.DataFrame, columns: List[str], drop_first: bool = False) -> pd.DataFrame:
         """
-        Applies one-hot encoding to a specified column, converting categorical values into a series of binary columns.
+        Applies one-hot encoding to the specified columns, converting categorical values into a series of binary columns.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the column to be encoded.
-            column (str): The name of the column to apply one-hot encoding.
+            df (pd.DataFrame): Input DataFrame containing the columns to be encoded.
+            columns (List[str]): List of column names to apply one-hot encoding.
             drop_first (bool): Whether to drop the first category to avoid multicollinearity. Default is False.
 
         Returns:
             pd.DataFrame: The DataFrame with the one-hot encoded columns appended.
         """
-        ohe = OneHotEncoder(sparse_output=False, drop='first' if drop_first else None)
-        encoded = ohe.fit_transform(df[[column]])
-        df_encoded = pd.DataFrame(encoded, columns=ohe.get_feature_names_out([column]), index=df.index)
-        df = pd.concat([df, df_encoded], axis=1)
-        self.encoders[column] = ohe
+        for column in columns:
+            ohe = OneHotEncoder(sparse_output=False, drop='first' if drop_first else None)
+            encoded = ohe.fit_transform(df[[column]])
+            df_encoded = pd.DataFrame(encoded, columns=ohe.get_feature_names_out([column]), index=df.index)
+            df = pd.concat([df, df_encoded], axis=1)
+            self.encoders[column] = ohe
         return df
 
-    def ordinal_encoding(self, df: pd.DataFrame, column: str, categories: list) -> pd.DataFrame:
+    def ordinal_encoding(self, df: pd.DataFrame, columns: List[str], categories: List[List[str]]) -> pd.DataFrame:
         """
-        Applies ordinal encoding to a specified column, encoding categories based on a predefined order.
+        Applies ordinal encoding to the specified columns, encoding categories based on a predefined order.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the column to be encoded.
-            column (str): The name of the column to apply ordinal encoding.
-            categories (list): List specifying the order of categories for ordinal encoding.
+            df (pd.DataFrame): Input DataFrame containing the columns to be encoded.
+            columns (List[str]): List of column names to apply ordinal encoding.
+            categories (List[List[str]]): List of lists specifying the order of categories for each column.
 
         Returns:
-            pd.DataFrame: The DataFrame with the ordinally encoded column appended as '{column}_encoded'.
+            pd.DataFrame: The DataFrame with the ordinally encoded columns appended as '{column}_encoded'.
         """
-        oe = OrdinalEncoder(categories=[categories])
-        df[f"{column}_encoded"] = oe.fit_transform(df[[column]])
-        self.encoders[column] = oe
+        for i, column in enumerate(columns):
+            oe = OrdinalEncoder(categories=[categories[i]])
+            df[f"{column}_encoded"] = oe.fit_transform(df[[column]])
+            self.encoders[column] = oe
         return df
 
-    def binary_encoding(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+    def binary_encoding(self, df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
         """
-        Applies binary encoding to a specified column, encoding categorical values into binary representations.
+        Applies binary encoding to the specified columns, encoding categorical values into binary representations.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the column to be encoded.
-            column (str): The name of the column to apply binary encoding.
+            df (pd.DataFrame): Input DataFrame containing the columns to be encoded.
+            columns (List[str]): List of column names to apply binary encoding.
 
         Returns:
             pd.DataFrame: The DataFrame with the binary encoded columns.
         """
-        be = ce.BinaryEncoder(cols=[column])
+        be = ce.BinaryEncoder(cols=columns)
         df = be.fit_transform(df)
-        self.encoders[column] = be
+        for column in columns:
+            self.encoders[column] = be
         return df
 
-    def target_encoding(self, df: pd.DataFrame, column: str, target: str) -> pd.DataFrame:
+    def target_encoding(self, df: pd.DataFrame, columns: List[str], target: str) -> pd.DataFrame:
         """
-        Applies target encoding to a specified column, encoding categorical values based on their relationship
+        Applies target encoding to the specified columns, encoding categorical values based on their relationship
         to a target variable.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the column to be encoded.
-            column (str): The name of the column to apply target encoding.
+            df (pd.DataFrame): Input DataFrame containing the columns to be encoded.
+            columns (List[str]): List of column names to apply target encoding.
             target (str): The target column used to compute the encoding.
 
         Returns:
-            pd.DataFrame: The DataFrame with the target encoded column appended as '{column}_encoded'.
+            pd.DataFrame: The DataFrame with the target encoded columns appended as '{column}_encoded'.
         """
-        te = ce.TargetEncoder(cols=[column])
-        df[f"{column}_encoded"] = te.fit_transform(df[column], df[target])
-        self.encoders[column] = te
+        te = ce.TargetEncoder(cols=columns)
+        df_encoded = te.fit_transform(df[columns], df[target])
+        df = pd.concat([df, df_encoded.add_suffix("_encoded")], axis=1)
+        for column in columns:
+            self.encoders[column] = te
         return df
 
-    def frequency_encoding(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+    def frequency_encoding(self, df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
         """
-        Applies frequency encoding to a specified column, encoding categories based on their frequency of occurrence.
+        Applies frequency encoding to the specified columns, encoding categories based on their frequency of occurrence.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the column to be encoded.
-            column (str): The name of the column to apply frequency encoding.
+            df (pd.DataFrame): Input DataFrame containing the columns to be encoded.
+            columns (List[str]): List of column names to apply frequency encoding.
 
         Returns:
-            pd.DataFrame: The DataFrame with the frequency encoded column appended as '{column}_encoded'.
+            pd.DataFrame: The DataFrame with the frequency encoded columns appended as '{column}_encoded'.
         """
-        freq = df[column].value_counts(normalize=True)
-        df[f"{column}_encoded"] = df[column].map(freq)
+        for column in columns:
+            freq = df[column].value_counts(normalize=True)
+            df[f"{column}_encoded"] = df[column].map(freq)
         return df
