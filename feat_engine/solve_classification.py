@@ -206,30 +206,39 @@ class ClassificationSolver:
         self.logger.info(f"Best parameters found for {model_name}: {grid_search.best_params_}")
         return grid_search.best_estimator_
 
-    def auto_select_best_model(self, X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series) -> str:
+    def auto_select_best_model(self, X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5) -> str:
         """
-        Automatically selects the best model based on accuracy score.
+        Automatically selects the best model based on cross-validated accuracy score.
 
         Args:
             X_train (pd.DataFrame): Training features.
             y_train (pd.Series): Training target.
-            X_test (pd.DataFrame): Testing features.
-            y_test (pd.Series): Testing target.
+            cv (int): Number of cross-validation folds (default: 5).
 
         Returns:
-            str: The name of the best performing model.
+            str: The name of the best performing model based on cross-validation.
         """
-        self.logger.info("Automatically selecting the best model based on accuracy...")
+        self.logger.info("Automatically selecting the best model based on cross-validated accuracy...")
         best_score = 0
         best_model_name = ""
+
         for model_name in self.models:
-            self.logger.info(f"Training and evaluating model: {model_name}")
-            model = self.train_model(model_name, X_train, y_train)
-            score = self.evaluate_model(model, X_test, y_test)['accuracy']
-            if score > best_score:
-                best_score = score
+            self.logger.info(f"Cross-validating model: {model_name}")
+            model = self.models[model_name]
+
+            # Perform cross-validation
+            scores = cross_val_score(model, X_train, y_train.values.ravel(), cv=cv, scoring='accuracy')
+            mean_score = scores.mean()
+            std_score = scores.std()
+
+            self.logger.info(f"{model_name} - Mean Accuracy: {mean_score:.4f}, Std: {std_score:.4f}")
+
+            # Check if this model performs better than the current best
+            if mean_score > best_score:
+                best_score = mean_score
                 best_model_name = model_name
-        self.logger.info(f"Best model selected: {best_model_name} with accuracy: {best_score}")
+
+        self.logger.info(f"Best model selected: {best_model_name} with cross-validated accuracy: {best_score:.4f}")
         return best_model_name
 
     def plot_confusion_matrix(self, conf_matrix: np.ndarray, class_names: List[str]) -> None:
