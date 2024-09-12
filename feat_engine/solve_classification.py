@@ -38,6 +38,7 @@ class ClassificationSolver:
         """
         self.logger = self.setup_logger()
         self.models = models or self.default_models()
+        self.tuned_models: Dict[str, Any] = {}
 
     def default_models(self) -> Dict[str, Any]:
         """
@@ -113,6 +114,15 @@ class ClassificationSolver:
                 'learning_rate': [0.01, 0.1],
                 'depth': [3, 5, 7],
             },
+            'Naive Bayes': {
+                'var_smoothing': np.logspace(0, -9, num=100)  # Default param grid for GaussianNB
+            },
+            'Voting Classifier': {
+                'voting': ['soft', 'hard'],
+                'weights': [[1, 1, 1], [2, 1, 1], [1, 2, 1]],  # Adjust the weights of the estimators
+                'estimators': [[('lr', LogisticRegression()), ('rf', RandomForestClassifier()), ('svc', SVC(probability=True))],
+                               [('lr', LogisticRegression()), ('gb', GradientBoostingClassifier()), ('knn', KNeighborsClassifier())]]
+            }
         }
 
     @staticmethod
@@ -236,36 +246,71 @@ class ClassificationSolver:
             'confusion_matrix': conf_matrix
         }
 
-    def hyperparameter_tuning(self, model_name: str, X_train: pd.DataFrame, y_train: pd.Series, param_grid: Dict[str, List[Any]] | None = None, cv: int = 5) -> Any:
+    def hyperparameter_tuning(
+            self,
+            model_name: str,
+            X_train: pd.DataFrame,
+            y_train: pd.Series,
+            param_grid: Dict[str, List[Any]] | None = None,
+            cv: int = 5
+    ) -> None:
         """
-        Performs hyperparameter tuning using GridSearchCV.
+        Performs hyperparameter tuning using GridSearchCV for one or all models and stores the best models.
+
+        Args:
+            model_name (str): The name of the model to tune. If 'all', tunes all models in self.models.
+            X_train (pd.DataFrame): Training features.
+            y_train (pd.Series): Training target.
+            param_grid (Dict[str, List[Any]] | None): Parameter grid for hyperparameter tuning. If None, uses default.
+            cv (int): Number of cross-validation folds.
+
+        Returns:
+            None: The best models are stored in self.tuned_models.
+        """
+        if model_name == 'all':
+            self.logger.info("Performing hyperparameter tuning for all models...")
+            for name in self.models:
+                self._tune_single_model(name, X_train, y_train, param_grid, cv)
+        else:
+            self._tune_single_model(model_name, X_train, y_train, param_grid, cv)
+
+        return None  # The tuned models are stored in self.tuned_models
+
+    def _tune_single_model(self, model_name: str, X_train: pd.DataFrame, y_train: pd.Series, param_grid: Dict[str, List[Any]] | None, cv: int) -> None:
+        """
+        Helper method to perform hyperparameter tuning for a single model.
 
         Args:
             model_name (str): The name of the model to tune.
             X_train (pd.DataFrame): Training features.
             y_train (pd.Series): Training target.
-            param_grid (Dict[str, List[Any]]): Parameter grid for hyperparameter tuning. If None, uses default.
+            param_grid (Dict[str, List[Any]] | None): Parameter grid for hyperparameter tuning. If None, uses default.
             cv (int): Number of cross-validation folds.
 
         Returns:
-            Any: The best estimator found by GridSearchCV.
+            None: The best model is stored in self.tuned_models.
         """
         model = self.models[model_name]
         self.logger.info(f"Performing hyperparameter tuning for {model_name}...")
 
         # Use default param_grid if none is provided
         if param_grid is None:
-            param_grid = self.default_param_grids()[model_name]
-            self.logger.info(f"Using default parameter grid for {model_name}: {param_grid}")
+            param_grid = self.default_param_grids().get(model_name, {})
+            if not param_grid:
+                self.logger.warning(f"No parameter grid available for {model_name}. Skipping tuning.")
+                return
 
         grid_search = GridSearchCV(model, param_grid, cv=cv, scoring='accuracy')
         grid_search.fit(X_train, y_train)
         self.logger.info(f"Best parameters found for {model_name}: {grid_search.best_params_}")
-        return grid_search.best_estimator_
+
+        # Store the tuned model for future use
+        self.tuned_models[model_name] = grid_search.best_estimator_
 
     def auto_select_best_model(self, X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5) -> str:
         """
         Automatically selects the best model based on cross-validated accuracy score.
+        It checks if a hyperparameter-tuned version of the model is available and uses it if present.
 
         Args:
             X_train (pd.DataFrame): Training features.
@@ -280,8 +325,10 @@ class ClassificationSolver:
         best_model_name = ""
 
         for model_name in self.models:
-            self.logger.info(f"Cross-validating model: {model_name}")
-            model = self.models[model_name]
+            self.logger.info(f"Evaluating model: {model_name}")
+
+            # Use the tuned model if available
+            model = self.tuned_models.get(model_name, self.models[model_name])
 
             # Perform cross-validation
             scores = cross_val_score(model, X_train, y_train.values.ravel(), cv=cv, scoring='accuracy')
