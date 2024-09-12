@@ -301,7 +301,7 @@ class ClassificationSolver:
                 return
 
         grid_search = GridSearchCV(model, param_grid, cv=cv, scoring='accuracy')
-        grid_search.fit(X_train, y_train)
+        grid_search.fit(X_train, y_train.values.ravel())
         self.logger.info(f"Best parameters found for {model_name}: {grid_search.best_params_}")
 
         # Store the tuned model for future use
