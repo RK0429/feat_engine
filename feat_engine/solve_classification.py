@@ -307,7 +307,7 @@ class ClassificationSolver:
         # Store the tuned model for future use
         self.tuned_models[model_name] = grid_search.best_estimator_
 
-    def auto_select_best_model(self, X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5) -> str:
+    def auto_select_best_model(self, X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5) -> tuple[str, float]:
         """
         Automatically selects the best model based on cross-validated accuracy score.
         It checks if a hyperparameter-tuned version of the model is available and uses it if present.
@@ -343,7 +343,7 @@ class ClassificationSolver:
                 best_model_name = model_name
 
         self.logger.info(f"Best model selected: {best_model_name} with cross-validated accuracy: {best_score:.4f}")
-        return best_model_name
+        return best_model_name, best_score
 
     def plot_confusion_matrix(self, conf_matrix: np.ndarray, class_names: List[str]) -> None:
         """
