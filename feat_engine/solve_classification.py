@@ -64,6 +64,57 @@ class ClassificationSolver:
             ], voting='soft')
         }
 
+    def default_param_grids(self) -> Dict[str, Dict[str, List[Any]]]:
+        """
+        Provides default hyperparameter grids for common models.
+
+        Returns:
+            Dict[str, Dict[str, List[Any]]]: A dictionary of default param grids.
+        """
+        return {
+            'Logistic Regression': {
+                'C': [0.01, 0.1, 1, 10],
+                'solver': ['liblinear', 'lbfgs'],
+            },
+            'Random Forest': {
+                'n_estimators': [50, 100, 200],
+                'max_depth': [None, 10, 20],
+                'min_samples_split': [2, 5, 10],
+            },
+            'Gradient Boosting': {
+                'n_estimators': [50, 100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'max_depth': [3, 5, 10],
+            },
+            'Support Vector Machine': {
+                'C': [0.1, 1, 10],
+                'kernel': ['linear', 'rbf'],
+            },
+            'K-Nearest Neighbors': {
+                'n_neighbors': [3, 5, 7],
+                'weights': ['uniform', 'distance'],
+            },
+            'Decision Tree': {
+                'max_depth': [None, 10, 20],
+                'min_samples_split': [2, 5, 10],
+            },
+            'XGBoost': {
+                'n_estimators': [50, 100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'max_depth': [3, 5, 10],
+            },
+            'LightGBM': {
+                'n_estimators': [50, 100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'num_leaves': [31, 50, 100],
+            },
+            'CatBoost': {
+                'iterations': [100, 200],
+                'learning_rate': [0.01, 0.1],
+                'depth': [3, 5, 7],
+            },
+        }
+
     @staticmethod
     def setup_logger() -> logging.Logger:
         """
@@ -185,7 +236,7 @@ class ClassificationSolver:
             'confusion_matrix': conf_matrix
         }
 
-    def hyperparameter_tuning(self, model_name: str, X_train: pd.DataFrame, y_train: pd.Series, param_grid: Dict[str, List[Any]], cv: int = 5) -> Any:
+    def hyperparameter_tuning(self, model_name: str, X_train: pd.DataFrame, y_train: pd.Series, param_grid: Dict[str, List[Any]] | None = None, cv: int = 5) -> Any:
         """
         Performs hyperparameter tuning using GridSearchCV.
 
@@ -193,7 +244,7 @@ class ClassificationSolver:
             model_name (str): The name of the model to tune.
             X_train (pd.DataFrame): Training features.
             y_train (pd.Series): Training target.
-            param_grid (Dict[str, List[Any]]): Parameter grid for hyperparameter tuning.
+            param_grid (Dict[str, List[Any]]): Parameter grid for hyperparameter tuning. If None, uses default.
             cv (int): Number of cross-validation folds.
 
         Returns:
@@ -201,6 +252,12 @@ class ClassificationSolver:
         """
         model = self.models[model_name]
         self.logger.info(f"Performing hyperparameter tuning for {model_name}...")
+
+        # Use default param_grid if none is provided
+        if param_grid is None:
+            param_grid = self.default_param_grids()[model_name]
+            self.logger.info(f"Using default parameter grid for {model_name}: {param_grid}")
+
         grid_search = GridSearchCV(model, param_grid, cv=cv, scoring='accuracy')
         grid_search.fit(X_train, y_train)
         self.logger.info(f"Best parameters found for {model_name}: {grid_search.best_params_}")
