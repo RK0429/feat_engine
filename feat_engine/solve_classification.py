@@ -48,7 +48,7 @@ class ClassificationSolver:
             Dict[str, Any]: A dictionary of default models.
         """
         return {
-            'Logistic Regression': LogisticRegression(),
+            'Logistic Regression': LogisticRegression(max_iter=1000),
             'Random Forest': RandomForestClassifier(),
             'Gradient Boosting': GradientBoostingClassifier(),
             'Support Vector Machine': SVC(probability=True),
@@ -59,7 +59,7 @@ class ClassificationSolver:
             'CatBoost': CatBoostClassifier(verbose=0),
             'Naive Bayes': GaussianNB(),
             'Voting Classifier': VotingClassifier(estimators=[
-                ('lr', LogisticRegression()),
+                ('lr', LogisticRegression(max_iter=1000)),
                 ('rf', RandomForestClassifier()),
                 ('svc', SVC(probability=True))
             ], voting='soft')
@@ -67,61 +67,70 @@ class ClassificationSolver:
 
     def default_param_grids(self) -> Dict[str, Dict[str, List[Any]]]:
         """
-        Provides default hyperparameter grids for common models.
+        Provides refined hyperparameter grids for common models to enhance tuning performance.
 
         Returns:
-            Dict[str, Dict[str, List[Any]]]: A dictionary of default param grids.
+            Dict[str, Dict[str, List[Any]]]: A dictionary of refined param grids.
         """
         return {
             'Logistic Regression': {
-                'C': [0.01, 0.1, 1, 10],
-                'solver': ['liblinear', 'lbfgs'],
+                'C': [0.001, 0.01, 0.1, 1, 10, 100],
+                'solver': ['liblinear', 'lbfgs', 'saga', 'newton-cg'],
             },
             'Random Forest': {
-                'n_estimators': [50, 100, 200],
-                'max_depth': [None, 10, 20],
-                'min_samples_split': [2, 5, 10],
+                'n_estimators': [50, 100, 200, 500],
+                'max_depth': [None, 10, 20, 30, 40],
+                'min_samples_split': [2, 5, 10, 20],
+                'min_samples_leaf': [1, 2, 4],
+                'bootstrap': [True, False],
             },
             'Gradient Boosting': {
-                'n_estimators': [50, 100, 200],
-                'learning_rate': [0.01, 0.1, 0.2],
-                'max_depth': [3, 5, 10],
+                'n_estimators': [50, 100, 200, 300],
+                'learning_rate': [0.001, 0.01, 0.1, 0.2],
+                'max_depth': [3, 5, 7, 10, 15],
+                'subsample': [0.8, 0.9, 1.0],
             },
             'Support Vector Machine': {
-                'C': [0.1, 1, 10],
-                'kernel': ['linear', 'rbf'],
+                'C': [0.01, 0.1, 1, 10, 100],
+                'kernel': ['linear', 'rbf', 'poly', 'sigmoid'],
+                'gamma': ['scale', 'auto'],
             },
             'K-Nearest Neighbors': {
-                'n_neighbors': [3, 5, 7],
+                'n_neighbors': [3, 5, 7, 9, 11, 15],
                 'weights': ['uniform', 'distance'],
+                'p': [1, 2],
             },
             'Decision Tree': {
-                'max_depth': [None, 10, 20],
-                'min_samples_split': [2, 5, 10],
+                'max_depth': [None, 10, 20, 30, 40],
+                'min_samples_split': [2, 5, 10, 20],
+                'min_samples_leaf': [1, 2, 4],
+                'criterion': ['gini', 'entropy'],
             },
             'XGBoost': {
-                'n_estimators': [50, 100, 200],
-                'learning_rate': [0.01, 0.1, 0.2],
-                'max_depth': [3, 5, 10],
+                'n_estimators': [50, 100, 200, 500],
+                'learning_rate': [0.001, 0.01, 0.05, 0.1, 0.2],
+                'max_depth': [3, 5, 7, 10, 15],
+                'subsample': [0.7, 0.8, 0.9, 1.0],
             },
             'LightGBM': {
-                'n_estimators': [50, 100, 200],
-                'learning_rate': [0.01, 0.1, 0.2],
-                'num_leaves': [31, 50, 100],
+                'n_estimators': [50, 100, 200, 500],
+                'learning_rate': [0.001, 0.01, 0.05, 0.1, 0.2],
+                'num_leaves': [31, 50, 100, 150],
+                'max_depth': [-1, 10, 20, 30],
             },
             'CatBoost': {
-                'iterations': [100, 200],
-                'learning_rate': [0.01, 0.1],
-                'depth': [3, 5, 7],
+                'iterations': [100, 200, 500],
+                'learning_rate': [0.001, 0.01, 0.1, 0.2],
+                'depth': [3, 5, 7, 10],
             },
             'Naive Bayes': {
-                'var_smoothing': np.logspace(0, -9, num=100)  # Default param grid for GaussianNB
+                'var_smoothing': np.logspace(0, -9, num=100),  # Default param grid for GaussianNB
             },
             'Voting Classifier': {
                 'voting': ['soft', 'hard'],
-                'weights': [[1, 1, 1], [2, 1, 1], [1, 2, 1]],  # Adjust the weights of the estimators
+                'weights': [[1, 1, 1], [2, 1, 1], [1, 2, 1]],
                 'estimators': [[('lr', LogisticRegression()), ('rf', RandomForestClassifier()), ('svc', SVC(probability=True))],
-                               [('lr', LogisticRegression()), ('gb', GradientBoostingClassifier()), ('knn', KNeighborsClassifier())]]
+                               [('lr', LogisticRegression()), ('gb', GradientBoostingClassifier()), ('knn', KNeighborsClassifier())]],
             }
         }
 
