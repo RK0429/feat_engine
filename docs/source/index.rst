@@ -10,12 +10,15 @@ feat_engine documentation
    :maxdepth: 2
    :caption: Contents:
 
+   operate_dataframe
    handle_missing_values
    normalize_scaling
    encode_category
    interact_features
    transform_features
    reduce_dimension
+   cluster_data
+   select_features
    handle_outliers
    temporal_features
    group_features
