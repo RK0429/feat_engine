@@ -135,7 +135,7 @@ class ClassificationSolver:
         """
         model = self.models[model_name]
         self.logger.info(f"Training model: {model_name}...")
-        model.fit(X_train, y_train)
+        model.fit(X_train, y_train.values.ravel())
         return model
 
     def evaluate_model(self, model: Any, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, Any]:
