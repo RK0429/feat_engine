@@ -150,7 +150,7 @@ class FeatureSelector:
             pd.DataFrame: A DataFrame containing the features selected by Lasso.
         """
         lasso = LassoCV(alphas=[alpha], cv=5)
-        lasso.fit(X, y)
+        lasso.fit(X, y.values.ravel())
         selected_features = X.columns[np.abs(lasso.coef_) > 1e-5]
         return X[selected_features]
 
