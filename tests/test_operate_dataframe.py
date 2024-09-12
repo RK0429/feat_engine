@@ -194,8 +194,8 @@ def test_change_column_types() -> None:
 
     df_converted = DataFrameOperator.change_column_types(df, {'A': 'int', 'B': 'float'})
 
-    assert df_converted['A'].dtype == 'int64'
-    assert df_converted['B'].dtype == 'float64'
+    assert pd.api.types.is_integer_dtype(df_converted['A'].dtype)  # This checks for any integer type (int32 or int64)
+    assert pd.api.types.is_float_dtype(df_converted['B'].dtype)    # This checks for any float type (float32 or float64)
 
 
 def test_sort_values() -> None:
