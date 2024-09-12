@@ -111,7 +111,7 @@ class FeatureSelector:
         Returns:
             pd.DataFrame: A DataFrame containing the top n selected features.
         """
-        model.fit(X, y)
+        model.fit(X, y.values.ravel())
         feature_importances = model.feature_importances_ if hasattr(model, 'feature_importances_') else model.coef_[0]
         indices = np.argsort(feature_importances)[::-1][:n_features]
         selected_features = X.columns[indices]
