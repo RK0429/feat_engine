@@ -3,6 +3,8 @@ from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.experimental import enable_iterative_imputer  # Enable the experimental API
 from sklearn.impute import IterativeImputer
 from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.base import RegressorMixin
 
 
 class MissingValueHandler:
@@ -164,6 +166,46 @@ class MissingValueHandler:
         imputer = IterativeImputer()
         filled_data = pd.DataFrame(imputer.fit_transform(data), columns=data.columns)
         return filled_data
+
+    @staticmethod
+    def fill_missing_ml_regression(data: pd.DataFrame, target_column: str, model: RegressorMixin = RandomForestRegressor(), test_size: float = 0.2) -> pd.DataFrame:
+        """
+        Fills missing values in the target column using a machine learning regression model trained on the other columns.
+
+        Args:
+            data (pd.DataFrame): The input DataFrame.
+            target_column (str): The name of the column with missing values to impute.
+            model (Any): The machine learning model to use for regression. Default is RandomForestRegressor.
+            test_size (float): The proportion of the data to use as the test set when evaluating the model. Default is 0.2.
+
+        Returns:
+            pd.DataFrame: The DataFrame with missing values in the target column filled using regression.
+        """
+        # Split data into rows with and without missing values in the target column
+        df_complete = data.dropna(subset=[target_column])
+        df_missing = data[data[target_column].isnull()]
+
+        # If no missing data in the target column, return the original data
+        if df_missing.empty:
+            return data
+
+        # Features and target for training
+        X = df_complete.drop(columns=[target_column])
+        y = df_complete[target_column]
+
+        # Prepare the data for prediction (rows with missing target)
+        X_missing = df_missing.drop(columns=[target_column])
+
+        # Train the model
+        model.fit(X, y)
+
+        # Predict missing values
+        predicted_values = model.predict(X_missing)
+
+        # Fill missing values in the original data
+        data.loc[data[target_column].isnull(), target_column] = predicted_values
+
+        return data
 
     @staticmethod
     def add_missing_indicator(data: pd.DataFrame) -> pd.DataFrame:
