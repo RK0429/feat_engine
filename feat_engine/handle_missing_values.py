@@ -110,12 +110,12 @@ class MissingValueHandler:
             # Impute missing values for numerical columns
             if not num_cols.empty:
                 imputer_num = SimpleImputer(strategy=strategy_num)
-                filled_data[num_cols] = pd.DataFrame(imputer_num.fit_transform(data[num_cols]), columns=num_cols)
+                filled_data[num_cols] = pd.DataFrame(imputer_num.fit_transform(data[num_cols]), columns=num_cols, index=filled_data.index)
 
             # Impute missing values for categorical columns
             if not cat_cols.empty:
                 imputer_cat = SimpleImputer(strategy=strategy_cat)
-                filled_data[cat_cols] = pd.DataFrame(imputer_cat.fit_transform(data[cat_cols]), columns=cat_cols)
+                filled_data[cat_cols] = pd.DataFrame(imputer_cat.fit_transform(data[cat_cols]), columns=cat_cols, index=filled_data.index)
 
         return filled_data
 
@@ -175,7 +175,7 @@ class MissingValueHandler:
         Args:
             data (pd.DataFrame): The input DataFrame.
             target_column (str): The name of the column with missing values to impute.
-            model (Any): The machine learning model to use for regression. Default is RandomForestRegressor.
+            model (RegressorMixin): The machine learning model to use for regression. Default is RandomForestRegressor.
             test_size (float): The proportion of the data to use as the test set when evaluating the model. Default is 0.2.
 
         Returns:
