@@ -168,7 +168,7 @@ class MissingValueHandler:
         return filled_data
 
     @staticmethod
-    def fill_missing_ml_regression(data: pd.DataFrame, target_column: str, model: RegressorMixin = RandomForestRegressor(), test_size: float = 0.2) -> pd.DataFrame:
+    def fill_missing_ml_regression(data: pd.DataFrame, target_column: str, model: RegressorMixin = RandomForestRegressor()) -> pd.DataFrame:
         """
         Fills missing values in the target column using a machine learning regression model trained on the other columns.
 
