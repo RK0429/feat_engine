@@ -1,176 +1,187 @@
 import pandas as pd
 import numpy as np
-from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif, RFE, VarianceThreshold
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-from sklearn.linear_model import LogisticRegression, LassoCV
-from typing import Union
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_selection import (
+    SelectKBest,
+    chi2,
+    f_classif,
+    f_regression,
+    mutual_info_classif,
+    mutual_info_regression,
+    RFE,
+    VarianceThreshold,
+    SelectFromModel,
+)
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.linear_model import LogisticRegression, Lasso
+from typing import Optional, Union, List, Any
 
 
-class FeatureSelector:
+class FeatureSelector(BaseEstimator, TransformerMixin):
     """
-    A utility class for selecting important features from datasets using various statistical tests and model-based methods.
-    This class provides several techniques, including chi-squared tests, ANOVA F-tests, mutual information, recursive feature elimination (RFE),
-    Lasso (L1) regularization, and correlation-based elimination.
+    A transformer for selecting important features from datasets using various statistical tests and model-based methods.
+    This class provides several techniques, including chi-squared tests, ANOVA F-tests, mutual information,
+    recursive feature elimination (RFE), Lasso (L1) regularization, and correlation-based elimination.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        method: str = 'kbest_anova',
+        k: int = 10,
+        threshold: float = 0.0,
+        model: Optional[Any] = None,
+        estimator: Optional[Any] = None,
+        scoring: Optional[str] = None,
+        alpha: float = 1.0,
+        corr_threshold: float = 0.9,
+        problem_type: str = 'classification',
+        **kwargs: Any,
+    ) -> None:
         """
-        Initializes the `FeatureSelector` class. No internal state is set by default.
-        """
-        pass
-
-    @staticmethod
-    def select_kbest_chi2(X: pd.DataFrame, y: pd.Series, k: int = 10) -> pd.DataFrame:
-        """
-        Select the top k features using the chi-squared statistical test for feature selection.
-        This method is best suited for categorical data and non-negative features.
+        Initializes the FeatureSelector with the specified method and parameters.
 
         Args:
-            X (pd.DataFrame): The input feature matrix containing independent variables.
-            y (pd.Series): The target variable (dependent variable).
-            k (int): The number of top features to select (default: 10).
-
-        Returns:
-            pd.DataFrame: A DataFrame containing only the top k selected features.
+            method (str): Feature selection method to use. Options are:
+                - 'kbest_chi2'
+                - 'kbest_anova'
+                - 'kbest_mutual_info'
+                - 'variance_threshold'
+                - 'rfe'
+                - 'lasso'
+                - 'feature_importance'
+                - 'correlation'
+            k (int): Number of top features to select (for k-best methods). Default is 10.
+            threshold (float): Threshold for variance threshold method. Default is 0.0.
+            model (Any, optional): Model to use for model-based selection (e.g., RFE). If None, defaults to RandomForestClassifier or RandomForestRegressor based on problem_type.
+            estimator (Any, optional): Estimator to use for SelectFromModel. If None, defaults to RandomForestClassifier or RandomForestRegressor based on problem_type.
+            scoring (str, optional): Scoring function to use. Default is None.
+            alpha (float): Regularization strength for Lasso. Default is 1.0.
+            corr_threshold (float): Correlation threshold for correlation-based selection. Default is 0.9.
+            problem_type (str): 'classification' or 'regression'. Default is 'classification'.
+            **kwargs: Additional keyword arguments.
         """
-        selector = SelectKBest(chi2, k=k)
-        X_new = selector.fit_transform(X, y)
-        selected_features = X.columns[selector.get_support()]
-        return pd.DataFrame(X_new, columns=selected_features)
+        self.method = method
+        self.k = k
+        self.threshold = threshold
+        self.model = model
+        self.estimator = estimator
+        self.scoring = scoring
+        self.alpha = alpha
+        self.corr_threshold = corr_threshold
+        self.problem_type = problem_type
+        self.kwargs = kwargs
 
-    @staticmethod
-    def select_kbest_anova(X: pd.DataFrame, y: pd.Series, k: int = 10) -> pd.DataFrame:
+        self.selector: Optional[TransformerMixin] = None
+        self.support_: Optional[np.ndarray] = None
+        self.selected_features_: Optional[List[str]] = None
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'FeatureSelector':
         """
-        Select the top k features using ANOVA F-test, which evaluates the variance between groups.
-        This method works best for continuous numerical features and when the target variable is categorical.
-
-        Args:
-            X (pd.DataFrame): The input feature matrix.
-            y (pd.Series): The categorical target variable.
-            k (int): The number of top features to select (default: 10).
-
-        Returns:
-            pd.DataFrame: A DataFrame containing the selected features.
-        """
-        selector = SelectKBest(f_classif, k=k)
-        X_new = selector.fit_transform(X, y)
-        selected_features = X.columns[selector.get_support()]
-        return pd.DataFrame(X_new, columns=selected_features)
-
-    @staticmethod
-    def select_kbest_mutual_info(X: pd.DataFrame, y: pd.Series, k: int = 10) -> pd.DataFrame:
-        """
-        Select the top k features based on mutual information, which measures the dependency between two variables.
-        Mutual information is non-parametric and can capture any kind of relationship between features and the target variable.
-
-        Args:
-            X (pd.DataFrame): The input feature matrix.
-            y (pd.Series): The target variable (categorical or continuous).
-            k (int): The number of top features to select (default: 10).
-
-        Returns:
-            pd.DataFrame: A DataFrame containing the top k selected features.
-        """
-        selector = SelectKBest(mutual_info_classif, k=k)
-        X_new = selector.fit_transform(X, y)
-        selected_features = X.columns[selector.get_support()]
-        return pd.DataFrame(X_new, columns=selected_features)
-
-    @staticmethod
-    def select_rfe(X: pd.DataFrame, y: pd.Series, model: Union[RandomForestClassifier, LogisticRegression] = RandomForestClassifier(), n_features_to_select: int = 10) -> pd.DataFrame:
-        """
-        Select features using Recursive Feature Elimination (RFE), a method that recursively removes the least important features
-        using a given model until the desired number of features is reached.
+        Fits the feature selector to the data.
 
         Args:
             X (pd.DataFrame): The input feature matrix.
-            y (pd.Series): The target variable.
-            model (Union[RandomForestClassifier, LogisticRegression]): The machine learning model to use for RFE (default: RandomForestClassifier).
-            n_features_to_select (int): The number of features to select (default: 10).
+            y (pd.Series, optional): The target variable. Required for supervised feature selection methods.
 
         Returns:
-            pd.DataFrame: A DataFrame containing the selected features.
+            FeatureSelector: Returns self.
         """
-        rfe = RFE(model, n_features_to_select=n_features_to_select)
-        X_new = rfe.fit_transform(X, y)
-        selected_features = X.columns[rfe.get_support()]
-        return pd.DataFrame(X_new, columns=selected_features)
+        if self.problem_type not in ['classification', 'regression']:
+            raise ValueError("problem_type must be 'classification' or 'regression'.")
 
-    @staticmethod
-    def select_feature_importance(X: pd.DataFrame, y: pd.Series, model: Union[RandomForestClassifier, LogisticRegression, ExtraTreesClassifier] = RandomForestClassifier(), n_features: int = 10) -> pd.DataFrame:
+        if self.method == 'kbest_chi2':
+            if self.problem_type != 'classification':
+                raise ValueError("Chi-squared test can only be used for classification problems.")
+            self.selector = SelectKBest(score_func=chi2, k=self.k)
+            self.selector.fit(X, y)
+        elif self.method == 'kbest_anova':
+            if self.problem_type == 'classification':
+                self.selector = SelectKBest(score_func=f_classif, k=self.k)
+            else:
+                self.selector = SelectKBest(score_func=f_regression, k=self.k)
+            self.selector.fit(X, y)
+        elif self.method == 'kbest_mutual_info':
+            if self.problem_type == 'classification':
+                self.selector = SelectKBest(score_func=mutual_info_classif, k=self.k)
+            else:
+                self.selector = SelectKBest(score_func=mutual_info_regression, k=self.k)
+            self.selector.fit(X, y)
+        elif self.method == 'variance_threshold':
+            self.selector = VarianceThreshold(threshold=self.threshold)
+            self.selector.fit(X)
+        elif self.method == 'rfe':
+            if self.model is None:
+                self.model = RandomForestClassifier() if self.problem_type == 'classification' else RandomForestRegressor()
+            self.selector = RFE(estimator=self.model, n_features_to_select=self.k)
+            self.selector.fit(X, y)
+        elif self.method == 'lasso':
+            if self.problem_type == 'classification':
+                estimator = LogisticRegression(penalty='l1', solver='liblinear', C=1.0 / self.alpha)
+            else:
+                estimator = Lasso(alpha=self.alpha)
+            self.selector = SelectFromModel(estimator=estimator)
+            self.selector.fit(X, y)
+        elif self.method == 'feature_importance':
+            if self.estimator is None:
+                self.estimator = RandomForestClassifier() if self.problem_type == 'classification' else RandomForestRegressor()
+            self.selector = SelectFromModel(estimator=self.estimator, threshold=-np.inf, max_features=self.k)
+            self.selector.fit(X, y)
+        elif self.method == 'correlation':
+            corr_matrix = X.corr().abs()
+            upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+            to_drop = [column for column in upper_triangle.columns if any(upper_triangle[column] > self.corr_threshold)]
+            self.selected_features_ = [col for col in X.columns if col not in to_drop]
+            self.support_ = X.columns.isin(self.selected_features_)
+            return self
+        else:
+            raise ValueError(f"Unknown method: {self.method}")
+
+        self.support_ = self.selector.get_support()
+        self.selected_features_ = X.columns[self.support_].tolist()
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Select the top n features based on the feature importance scores generated by a model.
-        The importance scores can be obtained from tree-based models (e.g., Random Forest, Extra Trees) or logistic regression.
+        Transforms the input data to contain only the selected features.
 
         Args:
             X (pd.DataFrame): The input feature matrix.
-            y (pd.Series): The target variable.
-            model (Union[RandomForestClassifier, LogisticRegression, ExtraTreesClassifier]): The model to compute feature importance (default: RandomForestClassifier).
-            n_features (int): The number of top features to select (default: 10).
 
         Returns:
-            pd.DataFrame: A DataFrame containing the top n selected features.
+            pd.DataFrame: The transformed feature matrix containing only the selected features.
         """
-        model.fit(X, y.values.ravel())
-        feature_importances = model.feature_importances_ if hasattr(model, 'feature_importances_') else model.coef_[0]
-        indices = np.argsort(feature_importances)[::-1][:n_features]
-        selected_features = X.columns[indices]
-        return X[selected_features]
+        if self.selected_features_ is None:
+            raise ValueError("The model has not been fitted yet!")
+        return X.loc[:, self.selected_features_]
 
-    @staticmethod
-    def select_using_variance_threshold(X: pd.DataFrame, threshold: float = 0.1) -> pd.DataFrame:
+    def get_support(self, indices: bool = False) -> Union[np.ndarray, List[int]]:
         """
-        Removes features that have a variance below a specified threshold. Features with low variance are often
-        less informative and can be removed to improve model performance.
+        Get a mask, or integer index, of the features selected.
 
         Args:
-            X (pd.DataFrame): The input feature matrix.
-            threshold (float): The variance threshold for removing features (default: 0.1).
+            indices (bool): If True, the return value will be an array of indices of the selected features.
+                            If False, the return value will be a boolean mask.
 
         Returns:
-            pd.DataFrame: A DataFrame containing features that meet the variance threshold.
+            Union[np.ndarray, List[int]]: The mask of selected features, or array of indices.
         """
-        selector = VarianceThreshold(threshold=threshold)
-        X_new = selector.fit_transform(X)
-        selected_features = X.columns[selector.get_support()]
-        return pd.DataFrame(X_new, columns=selected_features)
+        if self.support_ is None:
+            raise ValueError("The model has not been fitted yet!")
+        if indices:
+            return np.where(self.support_)[0]  # type: ignore
+        else:
+            return self.support_
 
-    @staticmethod
-    def select_lasso(X: pd.DataFrame, y: pd.Series, alpha: float = 1.0) -> pd.DataFrame:
+    def get_feature_names_out(self, input_features: Optional[List[str]] = None) -> List[str]:
         """
-        Select features using Lasso (L1) regularization, which applies a penalty to less important features and drives their coefficients to zero.
-        This is useful for feature selection when there are many irrelevant features.
+        Get output feature names for transformation.
 
         Args:
-            X (pd.DataFrame): The input feature matrix.
-            y (pd.Series): The target variable.
-            alpha (float): The regularization strength (default: 1.0).
+            input_features (List[str], optional): Input feature names. If None, feature names are taken from the DataFrame columns.
 
         Returns:
-            pd.DataFrame: A DataFrame containing the features selected by Lasso.
+            List[str]: The list of selected feature names.
         """
-        lasso = LassoCV(alphas=[alpha], cv=5)
-        lasso.fit(X, y.values.ravel())
-        selected_features = X.columns[np.abs(lasso.coef_) > 1e-5]
-        return X[selected_features]
-
-    @staticmethod
-    def select_correlation(X: pd.DataFrame, threshold: float = 0.9) -> pd.DataFrame:
-        """
-        Removes highly correlated features based on a correlation matrix. This method is useful for reducing multicollinearity
-        in the dataset by keeping only one feature from pairs of highly correlated features.
-
-        Args:
-            X (pd.DataFrame): The input feature matrix.
-            threshold (float): The correlation threshold. Features with a correlation above this value will be considered redundant (default: 0.9).
-
-        Returns:
-            pd.DataFrame: A DataFrame with correlated features removed.
-        """
-        corr_matrix = X.corr().abs()
-        upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool_))
-
-        # Identify features with correlation greater than the threshold
-        to_drop = [column for column in upper_triangle.columns if any(upper_triangle[column] > threshold)]
-        X_new = X.drop(columns=to_drop)
-        return X_new
+        if self.selected_features_ is None:
+            raise ValueError("The model has not been fitted yet!")
+        return self.selected_features_

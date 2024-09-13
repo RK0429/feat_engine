@@ -1,191 +1,555 @@
 import pandas as pd
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.decomposition import PCA, TruncatedSVD, FactorAnalysis
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.manifold import TSNE, Isomap
-import umap.umap_ as umap  # Correct import
-import numpy as np
-from keras.layers import Input, Dense
-from keras.models import Model
+from sklearn.exceptions import NotFittedError
+import umap.umap_ as umap
+from typing import Optional, Any
+
+# Conditional import of keras depending on version
+try:
+    from keras.layers import Input, Dense  # type: ignore
+    from keras.models import Model  # type: ignore
+except ImportError:
+    from tensorflow.keras.layers import Input, Dense  # type: ignore
+    from tensorflow.keras.models import Model  # type: ignore
 
 
-class DimensionReducer:
+class PCAReducer(BaseEstimator, TransformerMixin):
     """
-    The DimensionReducer class provides methods for reducing the dimensionality of datasets
-    using various linear and non-linear techniques.
-    It includes traditional algorithms like PCA and LDA, as well as advanced methods like
-    t-SNE, UMAP, Isomap, and Autoencoders.
+    Dimensionality reduction using Principal Component Analysis (PCA).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, n_components: int = 2, **kwargs: Any):
         """
-        Initialize the DimensionReducer class.
-        """
-        pass
-
-    def pca(self, df: pd.DataFrame, n_components: int) -> pd.DataFrame:
-        """
-        Perform Principal Component Analysis (PCA) to reduce the dimensionality of the dataset.
-
-        PCA identifies the directions (principal components) that capture the maximum variance
-        in the data, projecting it into a lower-dimensional space.
+        Initializes the PCAReducer.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            n_components (int): The number of principal components to keep.
-
-        Returns:
-            pd.DataFrame: The transformed dataframe with reduced dimensionality.
+            n_components (int): Number of principal components to keep.
+            **kwargs: Additional keyword arguments for sklearn.decomposition.PCA.
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        pca = PCA(n_components=n_components)
-        pca_result = pca.fit_transform(numeric_df)
-        return pd.DataFrame(pca_result)
+        self.n_components = n_components
+        self.kwargs = kwargs
+        self.pca = PCA(n_components=self.n_components, **self.kwargs)
+        self.columns_ = None
 
-    def lda(self, df: pd.DataFrame, labels: pd.Series, n_components: int) -> pd.DataFrame:
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'PCAReducer':
         """
-        Perform Linear Discriminant Analysis (LDA) for supervised dimensionality reduction.
-
-        LDA finds the linear combinations of features that best separate classes
-        in the data.
+        Fits the PCA model to the data.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            labels (pd.Series): The class labels corresponding to the data points.
-            n_components (int): The number of linear discriminants to retain.
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
 
         Returns:
-            pd.DataFrame: The transformed dataframe with reduced dimensionality.
+            self
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        lda = LDA(n_components=n_components)
-        lda_result = lda.fit_transform(numeric_df, labels)
-        return pd.DataFrame(lda_result)
+        self.columns_ = X.columns
+        self.pca.fit(X)
+        return self
 
-    def svd(self, df: pd.DataFrame, n_components: int) -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Perform Singular Value Decomposition (SVD) to reduce the dimensionality of the dataset.
-
-        SVD is effective for working with sparse matrices and uncovering latent semantic
-        structures in the data.
+        Transforms the input DataFrame using the fitted PCA model.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            n_components (int): The number of singular values to retain.
+            X (pd.DataFrame): Input DataFrame.
 
         Returns:
-            pd.DataFrame: The transformed dataframe with reduced dimensionality.
+            pd.DataFrame: Transformed DataFrame.
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        svd = TruncatedSVD(n_components=n_components)
-        svd_result = svd.fit_transform(numeric_df)
-        return pd.DataFrame(svd_result)
+        if self.pca is None:
+            raise NotFittedError("This PCAReducer instance is not fitted yet.")
+        X_pca = self.pca.transform(X)
+        component_names = [f'PC{i+1}' for i in range(self.n_components)]
+        return pd.DataFrame(X_pca, columns=component_names, index=X.index)
 
-    def factor_analysis(self, df: pd.DataFrame, n_components: int) -> pd.DataFrame:
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
         """
-        Perform Factor Analysis for dimensionality reduction.
-
-        Factor Analysis models observed variables as linear combinations of potential factors,
-        reducing the dimensionality of the dataset.
+        Fits the PCA model and transforms the input DataFrame.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            n_components (int): The number of factors to retain.
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
 
         Returns:
-            pd.DataFrame: The transformed dataframe with reduced dimensionality.
+            pd.DataFrame: Transformed DataFrame.
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        fa = FactorAnalysis(n_components=n_components)
-        fa_result = fa.fit_transform(numeric_df)
-        return pd.DataFrame(fa_result)
+        return self.fit(X).transform(X)
 
-    def tsne(self, df: pd.DataFrame, n_components: int = 2, perplexity: int = 30) -> pd.DataFrame:
+
+class LDAReducer(BaseEstimator, TransformerMixin):
+    """
+    Dimensionality reduction using Linear Discriminant Analysis (LDA).
+    """
+
+    def __init__(self, n_components: int = 2, **kwargs: Any):
         """
-        Perform t-Distributed Stochastic Neighbor Embedding (t-SNE) for non-linear dimensionality reduction.
-
-        t-SNE is primarily used for visualizing high-dimensional datasets, preserving local
-        structures in a lower-dimensional space.
+        Initializes the LDAReducer.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            n_components (int): The number of dimensions to reduce to (default: 2).
-            perplexity (int): Controls the balance between local and global aspects of the data (default: 30).
-
-        Returns:
-            pd.DataFrame: The transformed dataframe with reduced dimensionality.
+            n_components (int): Number of linear discriminants to retain.
+            **kwargs: Additional keyword arguments for sklearn.discriminant_analysis.LinearDiscriminantAnalysis.
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        tsne = TSNE(n_components=n_components, perplexity=perplexity)
-        tsne_result = tsne.fit_transform(numeric_df)
-        return pd.DataFrame(tsne_result)
+        self.n_components = n_components
+        self.kwargs = kwargs
+        self.lda = LDA(n_components=self.n_components, **self.kwargs)
+        self.columns_ = None
 
-    def umap(self, df: pd.DataFrame, n_components: int = 2) -> pd.DataFrame:
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> 'LDAReducer':
         """
-        Perform Uniform Manifold Approximation and Projection (UMAP) for non-linear dimensionality reduction.
-
-        UMAP is useful for visualizing high-dimensional data with faster computation
-        and better preservation of global structures than t-SNE.
+        Fits the LDA model to the data.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            n_components (int): The number of dimensions to reduce to (default: 2).
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series): Target variable.
 
         Returns:
-            pd.DataFrame: The transformed dataframe with reduced dimensionality.
+            self
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        reducer = umap.UMAP(n_components=n_components)
-        umap_result = reducer.fit_transform(numeric_df)
-        return pd.DataFrame(umap_result)
+        self.columns_ = X.columns
+        self.lda.fit(X, y)
+        return self
 
-    def isomap(self, df: pd.DataFrame, n_components: int = 2, n_neighbors: int = 2) -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Perform Isomap for non-linear dimensionality reduction based on geodesic distances.
-
-        Isomap preserves the global structure of the data and is useful for manifold learning.
+        Transforms the input DataFrame using the fitted LDA model.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            n_components (int): The number of dimensions to reduce to (default: 2).
-            n_neighbors (int): The number of neighbors to use when computing geodesic distances (default: 2).
+            X (pd.DataFrame): Input DataFrame.
 
         Returns:
-            pd.DataFrame: The transformed dataframe with reduced dimensionality.
+            pd.DataFrame: Transformed DataFrame.
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        isomap = Isomap(n_components=n_components, n_neighbors=n_neighbors)
-        isomap_result = isomap.fit_transform(numeric_df)
-        return pd.DataFrame(isomap_result, index=df.index)
+        if self.lda is None:
+            raise NotFittedError("This LDAReducer instance is not fitted yet.")
+        X_lda = self.lda.transform(X)
+        component_names = [f'LD{i+1}' for i in range(self.n_components)]
+        return pd.DataFrame(X_lda, columns=component_names, index=X.index)
 
-    def autoencoder(self, df: pd.DataFrame, encoding_dim: int = 10, epochs: int = 50, batch_size: int = 10) -> pd.DataFrame:
+    def fit_transform(self, X: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
         """
-        Perform dimensionality reduction using Autoencoder.
-
-        Autoencoders are neural networks trained to reconstruct the input data,
-        with the hidden layer representing a lower-dimensional encoding.
+        Fits the LDA model and transforms the input DataFrame.
 
         Args:
-            df (pd.DataFrame): The input dataframe containing the features.
-            encoding_dim (int): The size of the encoding layer (default: 10).
-            epochs (int): The number of training iterations (default: 50).
-            batch_size (int): The size of batches for training (default: 10).
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series): Target variable.
 
         Returns:
-            pd.DataFrame: The reduced representation of the data learned by the autoencoder.
+            pd.DataFrame: Transformed DataFrame.
         """
-        numeric_df = df.select_dtypes(include=[np.number])
-        input_dim = numeric_df.shape[1]
+        return self.fit(X, y).transform(X)
+
+
+class SVDReducer(BaseEstimator, TransformerMixin):
+    """
+    Dimensionality reduction using Truncated Singular Value Decomposition (SVD).
+    """
+
+    def __init__(self, n_components: int = 2, **kwargs: Any):
+        """
+        Initializes the SVDReducer.
+
+        Args:
+            n_components (int): Number of singular values to keep.
+            **kwargs: Additional keyword arguments for sklearn.decomposition.TruncatedSVD.
+        """
+        self.n_components = n_components
+        self.kwargs = kwargs
+        self.svd = TruncatedSVD(n_components=self.n_components, **self.kwargs)
+        self.columns_ = None
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'SVDReducer':
+        """
+        Fits the SVD model to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            self
+        """
+        self.columns_ = X.columns
+        self.svd.fit(X)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame using the fitted SVD model.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        if self.svd is None:
+            raise NotFittedError("This SVDReducer instance is not fitted yet.")
+        X_svd = self.svd.transform(X)
+        component_names = [f'SVD{i+1}' for i in range(self.n_components)]
+        return pd.DataFrame(X_svd, columns=component_names, index=X.index)
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the SVD model and transforms the input DataFrame.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        return self.fit(X).transform(X)
+
+
+class FactorAnalysisReducer(BaseEstimator, TransformerMixin):
+    """
+    Dimensionality reduction using Factor Analysis.
+    """
+
+    def __init__(self, n_components: int = 2, **kwargs: Any):
+        """
+        Initializes the FactorAnalysisReducer.
+
+        Args:
+            n_components (int): Number of factors to retain.
+            **kwargs: Additional keyword arguments for sklearn.decomposition.FactorAnalysis.
+        """
+        self.n_components = n_components
+        self.kwargs = kwargs
+        self.fa = FactorAnalysis(n_components=self.n_components, **self.kwargs)
+        self.columns_ = None
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'FactorAnalysisReducer':
+        """
+        Fits the Factor Analysis model to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            self
+        """
+        self.columns_ = X.columns
+        self.fa.fit(X)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame using the fitted Factor Analysis model.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        if self.fa is None:
+            raise NotFittedError("This FactorAnalysisReducer instance is not fitted yet.")
+        X_fa = self.fa.transform(X)
+        component_names = [f'FA{i+1}' for i in range(self.n_components)]
+        return pd.DataFrame(X_fa, columns=component_names, index=X.index)
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the Factor Analysis model and transforms the input DataFrame.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        return self.fit(X).transform(X)
+
+
+class TSNEReducer(BaseEstimator, TransformerMixin):
+    """
+    Dimensionality reduction using t-Distributed Stochastic Neighbor Embedding (t-SNE).
+    """
+
+    def __init__(self, n_components: int = 2, perplexity: float = 30.0, **kwargs: Any):
+        """
+        Initializes the TSNEReducer.
+
+        Args:
+            n_components (int): Number of dimensions to reduce to.
+            perplexity (float): Perplexity parameter for t-SNE.
+            **kwargs: Additional keyword arguments for sklearn.manifold.TSNE.
+        """
+        self.n_components = n_components
+        self.perplexity = perplexity
+        self.kwargs = kwargs
+        self.tsne = TSNE(n_components=self.n_components, perplexity=self.perplexity, **self.kwargs)
+        self.columns_ = None
+        self.fitted = False
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'TSNEReducer':
+        """
+        Fits the t-SNE model to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            self
+        """
+        self.columns_ = X.columns
+        self.tsne.fit(X)
+        self.fitted = True
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame using the fitted t-SNE model.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        if not self.fitted:
+            raise NotFittedError("This TSNEReducer instance is not fitted yet.")
+        X_tsne = self.tsne.fit_transform(X)
+        component_names = [f'tSNE{i+1}' for i in range(self.n_components)]
+        return pd.DataFrame(X_tsne, columns=component_names, index=X.index)
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the t-SNE model and transforms the input DataFrame.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        self.fit(X)
+        return self.transform(X)
+
+
+class UMAPReducer(BaseEstimator, TransformerMixin):
+    """
+    Dimensionality reduction using Uniform Manifold Approximation and Projection (UMAP).
+    """
+
+    def __init__(self, n_components: int = 2, **kwargs: Any):
+        """
+        Initializes the UMAPReducer.
+
+        Args:
+            n_components (int): Number of dimensions to reduce to.
+            **kwargs: Additional keyword arguments for umap.UMAP.
+        """
+        self.n_components = n_components
+        self.kwargs = kwargs
+        self.umap = umap.UMAP(n_components=self.n_components, **self.kwargs)
+        self.columns_ = None
+        self.fitted = False
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'UMAPReducer':
+        """
+        Fits the UMAP model to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable.
+
+        Returns:
+            self
+        """
+        self.columns_ = X.columns
+        self.umap.fit(X, y=y)
+        self.fitted = True
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame using the fitted UMAP model.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        if not self.fitted:
+            raise NotFittedError("This UMAPReducer instance is not fitted yet.")
+        X_umap = self.umap.transform(X)
+        component_names = [f'UMAP{i+1}' for i in range(self.n_components)]
+        return pd.DataFrame(X_umap, columns=component_names, index=X.index)
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the UMAP model and transforms the input DataFrame.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable.
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        return self.fit(X, y=y).transform(X)
+
+
+class IsomapReducer(BaseEstimator, TransformerMixin):
+    """
+    Dimensionality reduction using Isomap.
+    """
+
+    def __init__(self, n_components: int = 2, n_neighbors: int = 5, **kwargs: Any):
+        """
+        Initializes the IsomapReducer.
+
+        Args:
+            n_components (int): Number of dimensions to reduce to.
+            n_neighbors (int): Number of neighbors to use when computing geodesic distances.
+            **kwargs: Additional keyword arguments for sklearn.manifold.Isomap.
+        """
+        self.n_components = n_components
+        self.n_neighbors = n_neighbors
+        self.kwargs = kwargs
+        self.isomap = Isomap(n_components=self.n_components, n_neighbors=self.n_neighbors, **self.kwargs)
+        self.columns_ = None
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'IsomapReducer':
+        """
+        Fits the Isomap model to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            self
+        """
+        self.columns_ = X.columns
+        self.isomap.fit(X)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame using the fitted Isomap model.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        X_isomap = self.isomap.transform(X)
+        component_names = [f'Isomap{i+1}' for i in range(self.n_components)]
+        return pd.DataFrame(X_isomap, columns=component_names, index=X.index)
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the Isomap model and transforms the input DataFrame.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        return self.fit(X).transform(X)
+
+
+class AutoencoderReducer(BaseEstimator, TransformerMixin):
+    """
+    Dimensionality reduction using Autoencoders.
+    """
+
+    def __init__(self, encoding_dim: int = 10, epochs: int = 50, batch_size: int = 32, optimizer: str = 'adam', loss: str = 'mse', **kwargs: Any):
+        """
+        Initializes the AutoencoderReducer.
+
+        Args:
+            encoding_dim (int): Size of the encoding layer.
+            epochs (int): Number of training epochs.
+            batch_size (int): Batch size for training.
+            optimizer (str): Optimizer to use for training.
+            loss (str): Loss function to use for training.
+            **kwargs: Additional keyword arguments for keras models.
+        """
+        self.encoding_dim = encoding_dim
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.optimizer = optimizer
+        self.loss = loss
+        self.kwargs = kwargs
+        self.autoencoder = None
+        self.encoder = None
+        self.columns_ = None
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'AutoencoderReducer':
+        """
+        Fits the Autoencoder model to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            self
+        """
+        self.columns_ = X.columns
+        input_dim = X.shape[1]
         input_layer = Input(shape=(input_dim,))
-        encoded = Dense(encoding_dim, activation='relu')(input_layer)
+        encoded = Dense(self.encoding_dim, activation='relu')(input_layer)
         decoded = Dense(input_dim, activation='sigmoid')(encoded)
 
-        autoencoder = Model(input_layer, decoded)
-        autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+        self.autoencoder = Model(input_layer, decoded)
+        self.autoencoder.compile(optimizer=self.optimizer, loss=self.loss)  # type: ignore
 
         # Train the autoencoder
-        autoencoder.fit(numeric_df, numeric_df, epochs=epochs, batch_size=batch_size, verbose=0)
+        self.autoencoder.fit(  # type: ignore
+            X.values, X.values,
+            epochs=self.epochs,
+            batch_size=self.batch_size,
+            shuffle=True,
+            verbose=0
+        )
 
-        # Get the encoded representation
-        encoder = Model(input_layer, encoded)
-        encoded_data = encoder.predict(numeric_df)
-        return pd.DataFrame(encoded_data)
+        # Create encoder model
+        self.encoder = Model(inputs=input_layer, outputs=encoded)
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame using the trained Autoencoder.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        if self.encoder is None:
+            raise NotFittedError("This AutoencoderReducer instance is not fitted yet.")
+        X_encoded = self.encoder.predict(X.values)
+        component_names = [f'AE{i+1}' for i in range(self.encoding_dim)]
+        return pd.DataFrame(X_encoded, columns=component_names, index=X.index)
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the Autoencoder model and transforms the input DataFrame.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            pd.DataFrame: Transformed DataFrame.
+        """
+        self.fit(X)
+        return self.transform(X)

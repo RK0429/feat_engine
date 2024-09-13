@@ -1,143 +1,422 @@
 import pandas as pd
 import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from typing import Optional, List, Union, Dict
 
 
-class TemporalFeatures:
+class DatetimeConverter(BaseEstimator, TransformerMixin):
     """
-    TemporalFeatures provides methods for extracting, transforming, and handling temporal data.
-    These methods include datetime conversions, date part extraction, time differences, lag features,
-    rolling statistics, cyclical features, and data resampling.
+    Converts specified columns to datetime format.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, columns: Union[str, List[str]], format: Optional[str] = None, errors: str = 'raise'):
         """
-        Initialize the TemporalFeatures class.
-        """
-        pass
-
-    def convert_to_datetime(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
-        """
-        Convert a column to datetime format.
+        Initializes the DatetimeConverter.
 
         Args:
-            df (pd.DataFrame): Input DataFrame.
-            column (str): Column name to convert to datetime.
+            columns (str or List[str]): Column name or list of column names to convert to datetime.
+            format (str, optional): Datetime format to use for parsing. Default is None.
+            errors (str): How to handle errors. 'raise' will raise an exception, 'coerce' will set invalid parsing to NaT, 'ignore' will return the original input. Default is 'raise'.
+        """
+        self.columns = [columns] if isinstance(columns, str) else columns
+        self.format = format
+        self.errors = errors
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'DatetimeConverter':
+        """
+        Fit method does nothing as no fitting is required.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (ignored).
 
         Returns:
-            pd.DataFrame: DataFrame with the column converted to datetime.
+            DatetimeConverter: Returns self.
         """
-        df[column] = pd.to_datetime(df[column])
-        return df
+        return self
 
-    def extract_date_parts(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Extract year, month, day, day of the week, hour, minute, second, and weekend indicator from a datetime column.
+        Converts specified columns to datetime.
 
         Args:
-            df (pd.DataFrame): Input DataFrame.
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with specified columns converted to datetime.
+        """
+        X_transformed = X.copy()
+        for col in self.columns:
+            if col in X_transformed.columns:
+                X_transformed[col] = pd.to_datetime(X_transformed[col], format=self.format, errors=self.errors)
+            else:
+                raise ValueError(f"Column '{col}' not found in input DataFrame.")
+        return X_transformed
+
+
+class DatePartExtractor(BaseEstimator, TransformerMixin):
+    """
+    Extracts date parts from datetime columns.
+    """
+
+    def __init__(self, column: str, parts: Optional[List[str]] = None, prefix: Optional[str] = None):
+        """
+        Initializes the DatePartExtractor.
+
+        Args:
             column (str): Name of the datetime column.
-
-        Returns:
-            pd.DataFrame: DataFrame with extracted date parts such as year, month, day, etc.
+            parts (List[str], optional): List of date parts to extract. Default is all parts.
+                Supported parts: 'year', 'month', 'day', 'hour', 'minute', 'second', 'dayofweek', 'is_weekend', 'quarter', 'dayofyear', 'weekofyear'.
+            prefix (str, optional): Prefix to add to the extracted feature names.
         """
-        df['year'] = df[column].dt.year
-        df['month'] = df[column].dt.month
-        df['day'] = df[column].dt.day
-        df['day_of_week'] = df[column].dt.dayofweek
-        df['hour'] = df[column].dt.hour
-        df['minute'] = df[column].dt.minute
-        df['second'] = df[column].dt.second
-        df['is_weekend'] = df[column].dt.dayofweek >= 5
-        return df
+        self.column = column
+        self.parts = parts or ['year', 'month', 'day', 'hour', 'minute', 'second', 'dayofweek', 'is_weekend']
+        self.prefix = prefix or ''
+        self.supported_parts = {
+            'year': 'year',
+            'month': 'month',
+            'day': 'day',
+            'hour': 'hour',
+            'minute': 'minute',
+            'second': 'second',
+            'dayofweek': 'dayofweek',
+            'weekday_name': 'weekday_name',  # Not in pandas >= 1.0.0
+            'is_weekend': 'is_weekend',
+            'quarter': 'quarter',
+            'dayofyear': 'dayofyear',
+            'weekofyear': 'weekofyear'
+        }
 
-    def create_time_difference(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'DatePartExtractor':
         """
-        Create a time difference between consecutive rows in a datetime column.
+        Fit method does nothing as no fitting is required.
 
         Args:
-            df (pd.DataFrame): Input DataFrame.
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (ignored).
+
+        Returns:
+            DatePartExtractor: Returns self.
+        """
+        # Check if parts are valid
+        invalid_parts = set(self.parts) - set(self.supported_parts.keys())
+        if invalid_parts:
+            raise ValueError(f"Unsupported date parts: {invalid_parts}")
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Extracts specified date parts from the datetime column.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with extracted date parts.
+        """
+        X_transformed = X.copy()
+        if self.column not in X_transformed.columns:
+            raise ValueError(f"Column '{self.column}' not found in input DataFrame.")
+        if not pd.api.types.is_datetime64_any_dtype(X_transformed[self.column]):
+            raise TypeError(f"Column '{self.column}' is not of datetime dtype.")
+        dt_series = X_transformed[self.column]
+        for part in self.parts:
+            feature_name = f"{self.prefix}{part}"
+            if part == 'year':
+                X_transformed[feature_name] = dt_series.dt.year
+            elif part == 'month':
+                X_transformed[feature_name] = dt_series.dt.month
+            elif part == 'day':
+                X_transformed[feature_name] = dt_series.dt.day
+            elif part == 'hour':
+                X_transformed[feature_name] = dt_series.dt.hour
+            elif part == 'minute':
+                X_transformed[feature_name] = dt_series.dt.minute
+            elif part == 'second':
+                X_transformed[feature_name] = dt_series.dt.second
+            elif part == 'dayofweek':
+                X_transformed[feature_name] = dt_series.dt.dayofweek
+            elif part == 'weekday_name':
+                X_transformed[feature_name] = dt_series.dt.day_name()
+            elif part == 'is_weekend':
+                X_transformed[feature_name] = dt_series.dt.dayofweek >= 5
+            elif part == 'quarter':
+                X_transformed[feature_name] = dt_series.dt.quarter
+            elif part == 'dayofyear':
+                X_transformed[feature_name] = dt_series.dt.dayofyear
+            elif part == 'weekofyear':
+                X_transformed[feature_name] = dt_series.dt.isocalendar().week
+            else:
+                raise ValueError(f"Unsupported date part: {part}")
+        return X_transformed
+
+
+class TimeDifferenceTransformer(BaseEstimator, TransformerMixin):
+    """
+    Creates time difference between consecutive rows in a datetime column.
+    """
+
+    def __init__(self, column: str, new_column_name: Optional[str] = None, periods: int = 1):
+        """
+        Initializes the TimeDifferenceTransformer.
+
+        Args:
             column (str): Name of the datetime column.
-
-        Returns:
-            pd.DataFrame: DataFrame with a new column 'time_diff' for time differences.
+            new_column_name (str, optional): Name of the new column to store time differences. Default is 'time_diff'.
+            periods (int): Number of periods to calculate difference over. Default is 1.
         """
-        df['time_diff'] = df[column].diff()
-        return df
+        self.column = column
+        self.new_column_name = new_column_name or 'time_diff'
+        self.periods = periods
 
-    def create_lag_features(self, df: pd.DataFrame, column: str, lags: list) -> pd.DataFrame:
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'TimeDifferenceTransformer':
         """
-        Create lag features based on specified lag values.
+        Fit method does nothing as no fitting is required.
 
         Args:
-            df (pd.DataFrame): Input DataFrame.
-            column (str): Column for which to create lag features.
-            lags (list): List of lag values to generate.
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (ignored).
+
+        Returns:
+            TimeDifferenceTransformer: Returns self.
+        """
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculates time differences.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with new time difference column.
+        """
+        X_transformed = X.copy()
+        if self.column not in X_transformed.columns:
+            raise ValueError(f"Column '{self.column}' not found in input DataFrame.")
+        if not pd.api.types.is_datetime64_any_dtype(X_transformed[self.column]):
+            raise TypeError(f"Column '{self.column}' is not of datetime dtype.")
+        X_transformed[self.new_column_name] = X_transformed[self.column].diff(periods=self.periods)
+        return X_transformed
+
+
+class LagFeatureCreator(BaseEstimator, TransformerMixin):
+    """
+    Creates lag features for specified columns.
+    """
+
+    def __init__(self, columns: Union[str, List[str]], lags: List[int]):
+        """
+        Initializes the LagFeatureCreator.
+
+        Args:
+            columns (str or List[str]): Column name(s) for which to create lag features.
+            lags (List[int]): List of lag periods.
+        """
+        self.columns = [columns] if isinstance(columns, str) else columns
+        self.lags = lags
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'LagFeatureCreator':
+        """
+        Fit method does nothing as no fitting is required.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (ignored).
+
+        Returns:
+            LagFeatureCreator: Returns self.
+        """
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Creates lag features.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
 
         Returns:
             pd.DataFrame: DataFrame with new lag feature columns.
         """
-        for lag in lags:
-            df[f'{column}_lag_{lag}'] = df[column].shift(lag)
-        return df
+        X_transformed = X.copy()
+        for col in self.columns:
+            if col not in X_transformed.columns:
+                raise ValueError(f"Column '{col}' not found in input DataFrame.")
+            for lag in self.lags:
+                X_transformed[f'{col}_lag_{lag}'] = X_transformed[col].shift(lag)
+        return X_transformed
 
-    def create_rolling_features(self, df: pd.DataFrame, column: str, window_size: int, feature: str = 'mean') -> pd.DataFrame:
+
+class RollingFeatureCreator(BaseEstimator, TransformerMixin):
+    """
+    Creates rolling statistics for specified columns.
+    """
+
+    def __init__(self, columns: Union[str, List[str]], window_size: int, statistics: List[str] = ['mean']):
         """
-        Create rolling statistics such as mean, sum, and standard deviation over a given window size.
+        Initializes the RollingFeatureCreator.
 
         Args:
-            df (pd.DataFrame): Input DataFrame.
-            column (str): Column for which to calculate rolling statistics.
+            columns (str or List[str]): Column name(s) for which to calculate rolling statistics.
             window_size (int): Size of the rolling window.
-            feature (str): Type of rolling statistic to calculate ('mean', 'sum', 'std').
-
-        Returns:
-            pd.DataFrame: DataFrame with rolling feature columns.
+            statistics (List[str]): List of rolling statistics to calculate ('mean', 'sum', 'std', 'min', 'max').
         """
-        if feature == 'mean':
-            df[f'{column}_rolling_mean_{window_size}'] = df[column].rolling(window=window_size).mean()
-        elif feature == 'sum':
-            df[f'{column}_rolling_sum_{window_size}'] = df[column].rolling(window=window_size).sum()
-        elif feature == 'std':
-            df[f'{column}_rolling_std_{window_size}'] = df[column].rolling(window=window_size).std()
-        else:
-            raise ValueError("Unsupported feature. Use 'mean', 'sum', or 'std'.")
-        return df
+        self.columns = [columns] if isinstance(columns, str) else columns
+        self.window_size = window_size
+        self.statistics = statistics
+        self.supported_statistics = ['mean', 'sum', 'std', 'min', 'max']
 
-    def cyclical_features(self, df: pd.DataFrame, column: str, max_value: int) -> pd.DataFrame:
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'RollingFeatureCreator':
         """
-        Create cyclical features for time-related columns (e.g., hours, months) using sine and cosine transformations.
+        Fit method does nothing as no fitting is required.
 
         Args:
-            df (pd.DataFrame): Input DataFrame.
-            column (str): Name of the cyclical column (e.g., 'hour').
-            max_value (int): Maximum value of the cyclical feature (e.g., 24 for hours, 12 for months).
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (ignored).
 
         Returns:
-            pd.DataFrame: DataFrame with new columns for sine and cosine transformations of the cyclical feature.
+            RollingFeatureCreator: Returns self.
         """
-        df[f'{column}_sin'] = np.sin(2 * np.pi * df[column] / max_value)
-        df[f'{column}_cos'] = np.cos(2 * np.pi * df[column] / max_value)
-        return df
+        # Check if statistics are valid
+        invalid_stats = set(self.statistics) - set(self.supported_statistics)
+        if invalid_stats:
+            raise ValueError(f"Unsupported statistics: {invalid_stats}")
+        return self
 
-    def resample_data(self, df: pd.DataFrame, column: str, rule: str, aggregation: str = 'sum') -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Resample the DataFrame based on a given frequency and aggregation method.
+        Creates rolling features.
 
         Args:
-            df (pd.DataFrame): Input DataFrame.
-            column (str): Name of the datetime column.
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with new rolling feature columns.
+        """
+        X_transformed = X.copy()
+        for col in self.columns:
+            if col not in X_transformed.columns:
+                raise ValueError(f"Column '{col}' not found in input DataFrame.")
+            for stat in self.statistics:
+                feature_name = f'{col}_rolling_{stat}_{self.window_size}'
+                if stat == 'mean':
+                    X_transformed[feature_name] = X_transformed[col].rolling(window=self.window_size).mean()
+                elif stat == 'sum':
+                    X_transformed[feature_name] = X_transformed[col].rolling(window=self.window_size).sum()
+                elif stat == 'std':
+                    X_transformed[feature_name] = X_transformed[col].rolling(window=self.window_size).std()
+                elif stat == 'min':
+                    X_transformed[feature_name] = X_transformed[col].rolling(window=self.window_size).min()
+                elif stat == 'max':
+                    X_transformed[feature_name] = X_transformed[col].rolling(window=self.window_size).max()
+                else:
+                    raise ValueError(f"Unsupported statistic: {stat}")
+        return X_transformed
+
+
+class CyclicalFeaturesEncoder(BaseEstimator, TransformerMixin):
+    """
+    Encodes cyclical features using sine and cosine transformations.
+    """
+
+    def __init__(self, columns: Union[str, List[str]], max_values: Union[int, List[int]]):
+        """
+        Initializes the CyclicalFeaturesEncoder.
+
+        Args:
+            columns (str or List[str]): Column name(s) to encode.
+            max_values (int or List[int]): Maximum value(s) of the cyclical features.
+                If columns is a list, max_values should be a list of the same length.
+        """
+        self.columns = [columns] if isinstance(columns, str) else columns
+        self.max_values = [max_values] if isinstance(max_values, int) else max_values
+        if len(self.columns) != len(self.max_values):
+            raise ValueError("The length of 'columns' and 'max_values' must be equal.")
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'CyclicalFeaturesEncoder':
+        """
+        Fit method does nothing as no fitting is required.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (ignored).
+
+        Returns:
+            CyclicalFeaturesEncoder: Returns self.
+        """
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Encodes cyclical features.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with new sine and cosine encoded columns.
+        """
+        X_transformed = X.copy()
+        for col, max_val in zip(self.columns, self.max_values):
+            if col not in X_transformed.columns:
+                raise ValueError(f"Column '{col}' not found in input DataFrame.")
+            X_transformed[f'{col}_sin'] = np.sin(2 * np.pi * X_transformed[col] / max_val)
+            X_transformed[f'{col}_cos'] = np.cos(2 * np.pi * X_transformed[col] / max_val)
+        return X_transformed
+
+
+class DataResampler(BaseEstimator, TransformerMixin):
+    """
+    Resamples the DataFrame based on a given frequency and aggregation method.
+    """
+
+    def __init__(self, datetime_column: str, rule: str, aggregation_methods: Union[str, Dict[str, str]] = 'sum'):
+        """
+        Initializes the DataResampler.
+
+        Args:
+            datetime_column (str): Name of the datetime column.
             rule (str): Resampling frequency (e.g., 'W' for weekly, 'M' for monthly).
-            aggregation (str): Aggregation method to apply during resampling ('sum', 'mean').
+            aggregation_methods (str or Dict[str, str]): Aggregation method(s) to apply during resampling.
+                If a string is provided, the same method is applied to all columns.
+                If a dict is provided, it should map column names to aggregation methods.
+                Supported methods include 'sum', 'mean', 'min', 'max', etc.
+        """
+        self.datetime_column = datetime_column
+        self.rule = rule
+        self.aggregation_methods = aggregation_methods
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'DataResampler':
+        """
+        Fit method does nothing as no fitting is required.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (ignored).
+
+        Returns:
+            DataResampler: Returns self.
+        """
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Resamples the DataFrame.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
 
         Returns:
             pd.DataFrame: Resampled DataFrame with aggregated values.
         """
-        df.set_index(column, inplace=True)
-        if aggregation == 'sum':
-            resampled_df = df.resample(rule).sum()
-        elif aggregation == 'mean':
-            resampled_df = df.resample(rule).mean()
-        else:
-            raise ValueError("Unsupported aggregation method. Use 'sum' or 'mean'.")
-        df.reset_index(inplace=True)
+        X_transformed = X.copy()
+        if self.datetime_column not in X_transformed.columns:
+            raise ValueError(f"Column '{self.datetime_column}' not found in input DataFrame.")
+        if not pd.api.types.is_datetime64_any_dtype(X_transformed[self.datetime_column]):
+            raise TypeError(f"Column '{self.datetime_column}' is not of datetime dtype.")
+        X_transformed.set_index(self.datetime_column, inplace=True)
+        resampled_df = X_transformed.resample(self.rule).agg(self.aggregation_methods)
+        resampled_df.reset_index(inplace=True)
         return resampled_df

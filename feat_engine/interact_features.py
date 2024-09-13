@@ -50,7 +50,7 @@ class PolynomialFeaturesTransformer(BaseEstimator, TransformerMixin):
             include_bias=self.include_bias,
             interaction_only=self.interaction_only
         )
-        self.poly.fit(X[self.features])
+        self.poly.fit(X[self.features])  # type: ignore
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -121,6 +121,9 @@ class ProductFeaturesTransformer(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: DataFrame with product features added.
         """
+        if self.feature_pairs is None:
+            raise ValueError("feature_pairs is None. Fit the transformer or provide feature pairs before calling transform.")
+
         X_transformed = X.copy()
         for (f1, f2) in self.feature_pairs:
             if f1 in X.columns and f2 in X.columns:
@@ -181,6 +184,9 @@ class ArithmeticCombinationsTransformer(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: DataFrame with arithmetic combination features added.
         """
+        if self.feature_pairs is None:
+            raise ValueError("feature_pairs is None. Fit the transformer or provide feature pairs before calling transform.")
+
         X_transformed = X.copy()
         for (f1, f2) in self.feature_pairs:
             if f1 not in X.columns or f2 not in X.columns:
@@ -243,6 +249,9 @@ class CrossedFeaturesTransformer(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: DataFrame with crossed features added.
         """
+        if self.feature_pairs is None:
+            raise ValueError("feature_pairs is None. Fit the transformer or provide feature pairs before calling transform.")
+
         X_transformed = X.copy()
         for (f1, f2) in self.feature_pairs:
             if f1 not in X.columns or f2 not in X.columns:

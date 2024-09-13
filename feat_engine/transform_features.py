@@ -1,151 +1,192 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import (
-    StandardScaler, MinMaxScaler, PowerTransformer, QuantileTransformer
+    StandardScaler,
+    MinMaxScaler,
+    PowerTransformer,
+    QuantileTransformer,
+    FunctionTransformer
 )
+from sklearn.base import BaseEstimator, TransformerMixin
+from typing import List, Optional, Union, Any, Dict
 from scipy.stats import boxcox
 
 
-class FeatureTransformer:
+class FeatureTransformer(BaseEstimator, TransformerMixin):
     """
-    The `FeatureTransformer` class provides various methods for transforming numerical features
-    in a dataset using techniques such as log transformation, power transformation, and scaling.
+    A transformer class that applies various feature transformations to numerical data,
+    including logarithmic, square root, power, scaling, and other transformations.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        columns: Optional[List[str]] = None,
+        transformations: Optional[Union[str, List[str], Dict[str, str]]] = None,
+        method: str = 'yeo-johnson',
+        output_distribution: str = 'normal',
+        **kwargs: Any
+    ):
         """
-        Initializes the `FeatureTransformer` class.
-        """
-        pass
-
-    def log_transform(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-        """
-        Apply log transformation to specified columns in the DataFrame.
+        Initializes the FeatureTransformer.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply log transformation to.
-
-        Returns:
-            pd.DataFrame: DataFrame with log-transformed columns.
+            columns (List[str], optional): List of column names to transform. If None, all numeric columns are used.
+            transformations (Union[str, List[str], Dict[str, str]], optional): Transformation(s) to apply.
+                Can be a single string, a list of strings, or a dictionary mapping columns to transformations.
+                Supported transformations include:
+                    - 'log'
+                    - 'sqrt'
+                    - 'power'
+                    - 'boxcox'
+                    - 'zscore'
+                    - 'minmax'
+                    - 'quantile'
+                    - 'rank'
+                    - 'dft' (Discrete Fourier Transform)
+            method (str): Method to use for power transformations ('yeo-johnson' or 'box-cox'). Default is 'yeo-johnson'.
+            output_distribution (str): Desired output distribution for quantile transformation ('normal' or 'uniform').
+            **kwargs: Additional keyword arguments for specific transformers.
         """
-        df[columns] = np.log(df[columns].replace(0, np.nan))  # Log of 0 is undefined, replaced with NaN
-        return df
+        self.columns = columns
+        self.transformations = transformations
+        self.method = method
+        self.output_distribution = output_distribution
+        self.kwargs = kwargs
+        self.transformers_: Dict[str, Any] = {}
 
-    def sqrt_transform(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'FeatureTransformer':
         """
-        Apply square root transformation to specified columns in the DataFrame.
+        Fits the transformer to the data.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply square root transformation to.
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
 
         Returns:
-            pd.DataFrame: DataFrame with square root-transformed columns.
+            self
         """
-        df[columns] = np.sqrt(df[columns])
-        return df
+        X = X.copy()
+        if self.columns is None:
+            self.columns = X.select_dtypes(include=[np.number]).columns.tolist()
 
-    def power_transform(self, df: pd.DataFrame, columns: list[str], method: str = 'yeo-johnson') -> pd.DataFrame:
+        if isinstance(self.transformations, str):
+            transformations = {col: self.transformations for col in self.columns}
+        elif isinstance(self.transformations, list):
+            transformations = {col: self.transformations[i % len(self.transformations)] for i, col in enumerate(self.columns)}
+        elif isinstance(self.transformations, dict):
+            transformations = self.transformations
+        else:
+            raise ValueError("transformations must be a string, list, or dictionary.")
+
+        for col in self.columns:
+            trans = transformations.get(col)
+            if trans == 'log':
+                self.transformers_[col] = FunctionTransformer(
+                    func=lambda x: np.log(x.replace(0, np.nan)),
+                    inverse_func=np.exp,
+                    check_inverse=False
+                )
+            elif trans == 'sqrt':
+                self.transformers_[col] = FunctionTransformer(
+                    func=np.sqrt,
+                    inverse_func=np.square,
+                    check_inverse=False
+                )
+            elif trans == 'power':
+                self.transformers_[col] = PowerTransformer(method=self.method, **self.kwargs)
+            elif trans == 'boxcox':
+                self.transformers_[col] = FunctionTransformer(
+                    func=lambda x: boxcox(x.clip(lower=1e-6))[0],
+                    check_inverse=False
+                )
+            elif trans == 'zscore':
+                self.transformers_[col] = StandardScaler(**self.kwargs)
+            elif trans == 'minmax':
+                self.transformers_[col] = MinMaxScaler(**self.kwargs)
+            elif trans == 'quantile':
+                self.transformers_[col] = QuantileTransformer(
+                    output_distribution=self.output_distribution, **self.kwargs
+                )
+            elif trans == 'rank':
+                self.transformers_[col] = FunctionTransformer(
+                    func=lambda x: x.rank(),
+                    check_inverse=False
+                )
+            elif trans == 'dft':
+                self.transformers_[col] = FunctionTransformer(
+                    func=lambda x: np.fft.fft(x.to_numpy()).real,
+                    check_inverse=False
+                )
+            else:
+                raise ValueError(f"Unsupported transformation: {trans}")
+
+            self.transformers_[col].fit(X[[col]])
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Apply power transformation (Yeo-Johnson or Box-Cox) to specified columns in the DataFrame.
+        Transforms the input DataFrame.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply power transformation to.
-            method (str): Method of power transformation to use ('yeo-johnson' or 'box-cox'). Box-Cox requires positive data.
+            X (pd.DataFrame): Input DataFrame.
 
         Returns:
-            pd.DataFrame: DataFrame with power-transformed columns.
+            pd.DataFrame: Transformed DataFrame.
         """
-        pt = PowerTransformer(method=method)
-        df[columns] = pt.fit_transform(df[columns])
-        return df
+        X_transformed = X.copy()
+        for col, transformer in self.transformers_.items():
+            if col in X.columns:
+                X_transformed[col] = transformer.transform(X[[col]])
+            else:
+                raise ValueError(f"Column '{col}' not found in input DataFrame.")
+        return X_transformed
 
-    def boxcox_transform(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+    def inverse_transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Apply Box-Cox transformation to a specified column in the DataFrame (only applicable to positive data).
+        Inverse transforms the input DataFrame.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            column (str): Column name to apply Box-Cox transformation to.
+            X (pd.DataFrame): Transformed DataFrame.
 
         Returns:
-            pd.DataFrame: DataFrame with the Box-Cox-transformed column.
+            pd.DataFrame: Original DataFrame.
         """
-        df[column], _ = boxcox(df[column].clip(lower=1e-6))  # Clip values to avoid zero or negative inputs
-        return df
+        X_inv = X.copy()
+        for col, transformer in self.transformers_.items():
+            if hasattr(transformer, 'inverse_transform'):
+                X_inv[col] = transformer.inverse_transform(X[[col]])
+            else:
+                raise ValueError(f"Transformer for column '{col}' does not support inverse_transform.")
+        return X_inv
 
-    def zscore_standardization(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """
-        Apply Z-score standardization to specified columns in the DataFrame.
+        Get parameters for this estimator.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply Z-score standardization to.
+            deep (bool): If True, will return the parameters for this estimator and contained subobjects that are estimators.
 
         Returns:
-            pd.DataFrame: DataFrame with standardized columns, where each column has mean 0 and variance 1.
+            Dict[str, Any]: Parameter names mapped to their values.
         """
-        scaler = StandardScaler()
-        df[columns] = scaler.fit_transform(df[columns])
-        return df
+        return {
+            'columns': self.columns,
+            'transformations': self.transformations,
+            'method': self.method,
+            'output_distribution': self.output_distribution,
+            **self.kwargs
+        }
 
-    def min_max_scaling(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    def set_params(self, **params: Any) -> 'FeatureTransformer':
         """
-        Apply min-max scaling to specified columns in the DataFrame.
+        Set the parameters of this estimator.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply min-max scaling to.
+            **params: Estimator parameters.
 
         Returns:
-            pd.DataFrame: DataFrame with scaled columns, where each value is between 0 and 1.
+            FeatureTransformer: Returns self.
         """
-        scaler = MinMaxScaler()
-        df[columns] = scaler.fit_transform(df[columns])
-        return df
-
-    def quantile_transform(self, df: pd.DataFrame, columns: list[str], output_distribution: str = 'normal') -> pd.DataFrame:
-        """
-        Apply quantile transformation to specified columns in the DataFrame.
-
-        Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply quantile transformation to.
-            output_distribution (str): Desired output distribution ('normal' or 'uniform').
-
-        Returns:
-            pd.DataFrame: DataFrame with quantile-transformed columns.
-        """
-        qt = QuantileTransformer(output_distribution=output_distribution)
-        df[columns] = qt.fit_transform(df[columns])
-        return df
-
-    def rank_transform(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-        """
-        Apply rank transformation to specified columns in the DataFrame.
-
-        Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply rank transformation to.
-
-        Returns:
-            pd.DataFrame: DataFrame with rank-transformed columns, where each value is replaced by its rank.
-        """
-        df[columns] = df[columns].rank()
-        return df
-
-    def discrete_fourier_transform(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-        """
-        Apply discrete Fourier transform to specified columns in the DataFrame.
-
-        Args:
-            df (pd.DataFrame): Input DataFrame containing numerical columns.
-            columns (list[str]): List of column names to apply Fourier transformation to.
-
-        Returns:
-            pd.DataFrame: DataFrame with Fourier-transformed columns, retaining the real part of the transformation.
-        """
-        df[columns] = np.fft.fft(df[columns].to_numpy(), axis=0).real
-        return df
+        for key, value in params.items():
+            setattr(self, key, value)
+        return self
