@@ -14,7 +14,10 @@ from sklearn.feature_selection import (
 )
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, Lasso
-from typing import Optional, Union, List, Any
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from typing import Optional, Union, List, Any, Dict
+from sklearn.exceptions import NotFittedError
 
 
 class FeatureSelector(BaseEstimator, TransformerMixin):
@@ -185,3 +188,237 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
         if self.selected_features_ is None:
             raise ValueError("The model has not been fitted yet!")
         return self.selected_features_
+
+
+class AutoFeatureSelector(BaseEstimator, TransformerMixin):
+    """
+    A transformer that automatically selects the best feature selection method and optimizes its parameters.
+    """
+
+    def __init__(
+        self,
+        problem_type: str = 'classification',
+        model: Optional[Any] = None,
+        param_distributions: Optional[Dict[str, Any]] = None,
+        cv: int = 5,
+        n_iter: int = 50,
+        scoring: Optional[str] = None,
+        random_state: int = 42,
+        search_type: str = 'grid',  # 'grid' or 'random'
+    ) -> None:
+        """
+        Initializes the AutomatedFeatureSelector with specified parameters.
+
+        Args:
+            problem_type (str): 'classification' or 'regression'. Default is 'classification'.
+            model (Any, optional): The machine learning model to use. If None, defaults to RandomForestClassifier or RandomForestRegressor based on problem_type.
+            param_distributions (Dict[str, Any], optional): Parameter grid or distributions for hyperparameter optimization.
+            cv (int): Number of cross-validation folds. Default is 5.
+            n_iter (int): Number of iterations for RandomizedSearchCV. Ignored if search_type is 'grid'.
+            scoring (str, optional): Scoring metric for optimization. Default is None.
+            random_state (int): Random seed for reproducibility. Default is 42.
+            search_type (str): Type of hyperparameter search ('grid' or 'random'). Default is 'grid'.
+        """
+        self.problem_type = problem_type
+        self.model = model
+        self.param_distributions = param_distributions
+        self.cv = cv
+        self.n_iter = n_iter
+        self.scoring = scoring
+        self.random_state = random_state
+        self.search_type = search_type
+
+        self.best_estimator_ = None
+        self.best_params_ = None
+        self.best_score_ = None
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'AutoFeatureSelector':
+        """
+        Fits the feature selector to the data, automatically selecting the best method and parameters.
+
+        Args:
+            X (pd.DataFrame): The input feature matrix.
+            y (pd.Series, optional): The target variable. Required for supervised feature selection methods.
+
+        Returns:
+            AutomatedFeatureSelector: Returns self.
+        """
+        if self.problem_type not in ['classification', 'regression']:
+            raise ValueError("problem_type must be 'classification' or 'regression'.")
+
+        # Define default machine learning model if not provided
+        if self.model is None:
+            if self.problem_type == 'classification':
+                self.model = RandomForestClassifier(random_state=self.random_state)
+            else:
+                self.model = RandomForestRegressor(random_state=self.random_state)
+
+        # Define the pipeline
+        pipe = Pipeline([
+            ('selector', 'passthrough'),  # Placeholder for feature selector
+            ('model', self.model)
+        ])
+
+        # Define parameter grid including different feature selection methods and their parameters
+        param_grid = self._get_param_grid()
+
+        # Choose the search method
+        if self.search_type == 'grid':
+            search = GridSearchCV(
+                estimator=pipe,
+                param_grid=param_grid,
+                scoring=self.scoring,
+                cv=self.cv,
+                n_jobs=-1,
+                verbose=1,
+            )
+        elif self.search_type == 'random':
+            search = RandomizedSearchCV(
+                estimator=pipe,
+                param_distributions=param_grid,
+                n_iter=self.n_iter,
+                scoring=self.scoring,
+                cv=self.cv,
+                n_jobs=-1,
+                verbose=1,
+                random_state=self.random_state,
+            )
+        else:
+            raise ValueError("search_type must be 'grid' or 'random'.")
+
+        # Fit the search object
+        search.fit(X, y)
+
+        # Store the best estimator and its parameters
+        self.best_estimator_ = search.best_estimator_
+        self.best_params_ = search.best_params_
+        self.best_score_ = search.best_score_
+
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input data to contain only the selected features.
+
+        Args:
+            X (pd.DataFrame): The input feature matrix.
+
+        Returns:
+            pd.DataFrame: The transformed feature matrix containing only the selected features.
+        """
+        if self.best_estimator_ is None:
+            raise NotFittedError("This AutomatedFeatureSelector instance is not fitted yet.")
+        return self.best_estimator_.named_steps['selector'].transform(X)
+
+    def get_support(self, indices: bool = False) -> Union[np.ndarray, List[int]]:
+        """
+        Get a mask, or integer index, of the features selected.
+
+        Args:
+            indices (bool): If True, the return value will be an array of indices of the selected features.
+                            If False, the return value will be a boolean mask.
+
+        Returns:
+            Union[np.ndarray, List[int]]: The mask of selected features, or array of indices.
+        """
+        if self.best_estimator_ is None:
+            raise NotFittedError("This AutomatedFeatureSelector instance is not fitted yet.")
+        support = self.best_estimator_.named_steps['selector'].get_support(indices)
+        return support
+
+    def get_feature_names_out(self, input_features: Optional[List[str]] = None) -> List[str]:
+        """
+        Get output feature names for transformation.
+
+        Args:
+            input_features (List[str], optional): Input feature names. If None, feature names are taken from the DataFrame columns.
+
+        Returns:
+            List[str]: The list of selected feature names.
+        """
+        if self.best_estimator_ is None:
+            raise NotFittedError("This AutomatedFeatureSelector instance is not fitted yet.")
+        if input_features is None:
+            raise ValueError("input_features must be provided.")
+        support = self.get_support(indices=True)
+        return [input_features[i] for i in support]
+
+    def _get_param_grid(self) -> List[Dict[str, Any]] | Dict[str, Any]:
+        """
+        Generates the parameter grid for hyperparameter optimization.
+
+        Returns:
+            Dict[str, Any]: The parameter grid.
+        """
+        if self.param_distributions is not None:
+            return self.param_distributions
+
+        # Define default parameter grid
+        if self.problem_type == 'classification':
+            param_grid = [
+                # SelectKBest with chi2
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [chi2],
+                    'selector__k': [5, 10, 'all'],
+                },
+                # SelectKBest with f_classif
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [f_classif],
+                    'selector__k': [5, 10, 'all'],
+                },
+                # SelectKBest with mutual_info_classif
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [mutual_info_classif],
+                    'selector__k': [5, 10, 'all'],
+                },
+                # VarianceThreshold
+                {
+                    'selector': [VarianceThreshold()],
+                    'selector__threshold': [0, 0.01, 0.1],
+                },
+                # SelectFromModel with LogisticRegression
+                {
+                    'selector': [SelectFromModel(LogisticRegression(solver='liblinear'))],
+                    'selector__threshold': ['mean', 'median', -np.inf],
+                },
+                # SelectFromModel with RandomForestClassifier
+                {
+                    'selector': [SelectFromModel(RandomForestClassifier(random_state=self.random_state))],
+                    'selector__threshold': ['mean', 'median', -np.inf],
+                },
+            ]
+        else:
+            param_grid = [
+                # SelectKBest with f_regression
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [f_regression],
+                    'selector__k': [5, 10, 'all'],
+                },
+                # SelectKBest with mutual_info_regression
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [mutual_info_regression],
+                    'selector__k': [5, 10, 'all'],
+                },
+                # VarianceThreshold
+                {
+                    'selector': [VarianceThreshold()],
+                    'selector__threshold': [0, 0.01, 0.1],
+                },
+                # SelectFromModel with Lasso
+                {
+                    'selector': [SelectFromModel(Lasso(random_state=self.random_state))],
+                    'selector__threshold': ['mean', 'median', -np.inf],
+                },
+                # SelectFromModel with RandomForestRegressor
+                {
+                    'selector': [SelectFromModel(RandomForestRegressor(random_state=self.random_state))],
+                    'selector__threshold': ['mean', 'median', -np.inf],
+                },
+            ]
+
+        return param_grid

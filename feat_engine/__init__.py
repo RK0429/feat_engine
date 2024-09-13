@@ -25,7 +25,10 @@ from .cluster_data import (
     AgglomerativeClusteringModel,
     GaussianMixtureClustering
 )
-from .select_features import FeatureSelector
+from .select_features import (
+    FeatureSelector,
+    AutoFeatureSelector
+)
 from .handle_outliers import (
     ZScoreOutlierDetector,
     IQRBasedOutlierDetector,
@@ -78,6 +81,7 @@ __all__ = [
     'AgglomerativeClusteringModel',
     'GaussianMixtureClustering',
     'FeatureSelector',
+    'AutoFeatureSelector',
     'ZScoreOutlierDetector',
     'IQRBasedOutlierDetector',
     'IsolationForestOutlierDetector',
