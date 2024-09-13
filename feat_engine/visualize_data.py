@@ -552,19 +552,26 @@ class DataVisualizer:
         Args:
             df (pd.DataFrame): Input dataframe.
             x (List[str], optional): The categorical feature(s) to plot on the x-axis.
-            y (List[str], optional): The numerical feature(s) to plot on the y-axis.
+            y (List[str], optional): The numerical feature(s) to plot on the y-axis. If None, only columns with more than 'max_unique' unique elements are considered.
             hue (str, optional): Column name for adding a hue to the plot.
             max_unique (int): Maximum number of unique values to consider a column categorical.
         """
+        # Select x columns (categorical)
         if x is None:
             x = [col for col in df.columns if df[col].nunique() <= max_unique]
         elif isinstance(x, str):
             x = [x]
+
+        # Select y columns (numerical with more than max_unique unique values)
         if y is None:
-            y = df.select_dtypes(include=[np.number]).columns.tolist()
+            y = [col for col in df.select_dtypes(include=[np.number]).columns if df[col].nunique() > max_unique]
         elif isinstance(y, str):
             y = [y]
+
+        # Create all combinations of x and y
         combinations_xy = [(xi, yi) for xi in x for yi in y]
+
+        # Plot boxplots
         for xi, yi in combinations_xy:
             plt.figure(figsize=(10, 6))
             sns.boxplot(x=xi, y=yi, hue=hue, data=df)
