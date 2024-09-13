@@ -500,7 +500,7 @@ class ClassificationSolver:
         else:
             raise ValueError("search_type must be either 'grid' or 'random'.")
 
-        search.fit(X_train, y_train)
+        search.fit(X_train, y_train.values.ravel())
         self.logger.info(
             f"Best parameters found for {model_name}: {search.best_params_}"
         )
