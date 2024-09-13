@@ -96,19 +96,21 @@ class ScalingNormalizer(BaseEstimator, TransformerMixin):
             raise ValueError("No columns to scale or normalize.")
 
         if isinstance(self.method, str):
-            # Same method for all columns
-            scaler = self._get_scaler(self.method)
-            scaler.fit(X[self.columns])
-            self.scalers = {col: scaler for col in self.columns}
+            # Same method for all columns, but still fit each column independently
+            for col in self.columns:
+                scaler = self._get_scaler(self.method)
+                scaler.fit(X[[col]])  # Fit the scaler on individual column
+                self.scalers[col] = scaler  # Store each fitted scaler separately
         elif isinstance(self.method, dict):
             # Different methods per column
             for col in self.columns:
                 method = self.method.get(col, 'standard')  # Default to 'standard' if not specified
                 scaler = self._get_scaler(method)
-                scaler.fit(X[[col]])
+                scaler.fit(X[[col]])  # Fit the scaler on individual column
                 self.scalers[col] = scaler
         else:
             raise ValueError("Method must be a string or a dictionary mapping columns to methods.")
+
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
