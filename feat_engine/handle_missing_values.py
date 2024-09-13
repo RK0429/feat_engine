@@ -1,9 +1,9 @@
 import pandas as pd
 from typing import List, Optional, Union, Any, Dict
+from sklearn.experimental import enable_iterative_imputer  # noqa F401
 from sklearn.impute import SimpleImputer, KNNImputer, IterativeImputer
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.base import RegressorMixin, ClassifierMixin
-from sklearn.experimental import enable_iterative_imputer  # noqa F401
 
 
 class MissingValueHandler:
