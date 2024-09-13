@@ -260,7 +260,7 @@ class MissingValueHandler:
 
         Args:
             data (pd.DataFrame): The input DataFrame.
-            columns (List[str], optional): List of columns to create indicators for. If None, all columns are used.
+            columns (List[str], optional): List of columns to create indicators for. If None, only columns with missing values are used.
             inplace (bool, optional): If True, perform operation in-place.
 
         Returns:
@@ -269,11 +269,14 @@ class MissingValueHandler:
         if not inplace:
             data = data.copy()
 
+        # If columns is None, select only the columns with missing values
         if columns is None:
-            columns = data.columns.tolist()
+            columns = data.columns[data.isnull().any()].tolist()
 
+        # Add missing value indicators for the specified columns
         for column in columns:
             data[f"{column}_missing"] = data[column].isnull().astype(int)
+
         return data
 
     @staticmethod
