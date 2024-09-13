@@ -90,7 +90,7 @@ class ClassificationSolver:
             ),
             "K-Nearest Neighbors": KNeighborsClassifier(),
             "Decision Tree": DecisionTreeClassifier(random_state=self.random_state),
-            "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="logloss"),
+            "XGBoost": XGBClassifier(eval_metric="logloss"),
             "LightGBM": LGBMClassifier(random_state=self.random_state),
             "CatBoost": CatBoostClassifier(
                 verbose=0, random_state=self.random_state
