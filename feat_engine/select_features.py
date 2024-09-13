@@ -157,6 +157,19 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
             raise ValueError("The model has not been fitted yet!")
         return X.loc[:, self.selected_features_]
 
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the feature selector and transforms the input data to contain only the selected features.
+
+        Args:
+            X (pd.DataFrame): The input feature matrix.
+            y (pd.Series, optional): The target variable. Required for supervised feature selection methods.
+
+        Returns:
+            pd.DataFrame: The transformed feature matrix containing only the selected features.
+        """
+        return self.fit(X, y).transform(X)
+
     def get_support(self, indices: bool = False) -> Union[np.ndarray, List[int]]:
         """
         Get a mask, or integer index, of the features selected.
@@ -309,6 +322,19 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         if self.best_estimator_ is None:
             raise NotFittedError("This AutomatedFeatureSelector instance is not fitted yet.")
         return self.best_estimator_.named_steps['selector'].transform(X)
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fits the feature selector and transforms the input data to contain only the selected features.
+
+        Args:
+            X (pd.DataFrame): The input feature matrix.
+            y (pd.Series, optional): The target variable. Required for supervised feature selection methods.
+
+        Returns:
+            pd.DataFrame: The transformed feature matrix containing only the selected features.
+        """
+        return self.fit(X, y).transform(X)
 
     def get_support(self, indices: bool = False) -> Union[np.ndarray, List[int]]:
         """
