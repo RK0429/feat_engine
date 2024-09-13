@@ -539,7 +539,7 @@ class DataVisualizer:
         combinations_xy = [(xi, yi) for xi in x for yi in y]
         for xi, yi in combinations_xy:
             plt.figure(figsize=(10, 6))
-            sns.barplot(x=xi, y=yi, hue=hue, data=df, ci=None)
+            sns.barplot(x=xi, y=yi, hue=hue, data=df, errorbar=None)
             plt.title(f'Barplot of {yi} by {xi}')
             plt.xlabel(xi)
             plt.ylabel(yi)
