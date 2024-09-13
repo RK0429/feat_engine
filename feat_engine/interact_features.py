@@ -1,88 +1,251 @@
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.base import BaseEstimator, TransformerMixin
+from typing import List, Tuple, Optional
 
 
-class FeatureInteraction:
+class PolynomialFeaturesTransformer(BaseEstimator, TransformerMixin):
     """
-    The `FeatureInteraction` class provides methods to generate various types of feature interactions,
-    including polynomial features, product features, arithmetic combinations, and crossed features for categorical variables.
+    Generates polynomial features for specified features in the input DataFrame.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        degree: int = 2,
+        include_bias: bool = False,
+        interaction_only: bool = False,
+        features: Optional[List[str]] = None
+    ):
         """
-        Initializes the `FeatureInteraction` class.
-        """
-        pass
-
-    def polynomial_features(self, df: pd.DataFrame, features: list[str], degree: int = 2) -> pd.DataFrame:
-        """
-        Generates polynomial features for specified features in the input DataFrame.
+        Initializes the PolynomialFeaturesTransformer.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the features to be used.
-            features (list[str]): List of feature names to generate polynomial interactions.
             degree (int): Degree of polynomial features to generate. Default is 2.
-
-        Returns:
-            pd.DataFrame: DataFrame containing both original features and generated polynomial features.
+            include_bias (bool): Whether to include a bias column. Default is False.
+            interaction_only (bool): If True, only interaction features are produced (no powers of single features). Default is False.
+            features (List[str], optional): List of feature names to generate polynomial interactions. If None, all numeric features are used.
         """
-        poly = PolynomialFeatures(degree=degree, include_bias=False)
-        poly_features = poly.fit_transform(df[features])
-        poly_feature_names = poly.get_feature_names_out(features)
-        df_poly = pd.DataFrame(poly_features, columns=poly_feature_names, index=df.index)
-        return pd.concat([df, df_poly], axis=1)
+        self.degree = degree
+        self.include_bias = include_bias
+        self.interaction_only = interaction_only
+        self.features = features
+        self.poly = None
 
-    def product_features(self, df: pd.DataFrame, feature_pairs: list[tuple[str, str]]) -> pd.DataFrame:
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'PolynomialFeaturesTransformer':
         """
-        Creates product interaction features between specified pairs of features.
+        Fits the transformer to the data.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the features.
-            feature_pairs (list[tuple[str, str]]): List of tuples representing feature pairs to create product features.
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
 
         Returns:
-            pd.DataFrame: DataFrame containing the original data and new product interaction features.
+            self
         """
-        for (f1, f2) in feature_pairs:
-            df[f'{f1}_x_{f2}'] = df[f1] * df[f2]
-        return df
+        if self.features is None:
+            self.features = X.select_dtypes(include=[np.number]).columns.tolist()
+        self.poly = PolynomialFeatures(
+            degree=self.degree,
+            include_bias=self.include_bias,
+            interaction_only=self.interaction_only
+        )
+        self.poly.fit(X[self.features])
+        return self
 
-    def arithmetic_combinations(self, df: pd.DataFrame, feature_pairs: list[tuple[str, str]], operations: list[str] = ['add', 'subtract']) -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Generates arithmetic combination features for specified feature pairs, applying operations such as addition,
-        subtraction, multiplication, and division.
+        Transforms the input DataFrame by adding polynomial features.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the features.
-            feature_pairs (list[tuple[str, str]]): List of tuples representing feature pairs for arithmetic combinations.
-            operations (list[str]): List of arithmetic operations to apply. Default includes 'add' and 'subtract'.
-                                    Other options are 'multiply' and 'divide'.
+            X (pd.DataFrame): Input DataFrame.
 
         Returns:
-            pd.DataFrame: DataFrame containing both the original features and newly generated arithmetic combination features.
+            pd.DataFrame: DataFrame with polynomial features added.
         """
-        for (f1, f2) in feature_pairs:
-            if 'add' in operations:
-                df[f'{f1}_plus_{f2}'] = df[f1] + df[f2]
-            if 'subtract' in operations:
-                df[f'{f1}_minus_{f2}'] = df[f1] - df[f2]
-            if 'multiply' in operations:
-                df[f'{f1}_times_{f2}'] = df[f1] * df[f2]
-            if 'divide' in operations and (df[f2] != 0).all():  # Avoid division by zero
-                df[f'{f1}_div_{f2}'] = df[f1] / df[f2]
-        return df
+        if self.poly is None:
+            raise RuntimeError("You must fit the transformer before transforming the data.")
 
-    def crossed_features(self, df: pd.DataFrame, feature_pairs: list[tuple[str, str]]) -> pd.DataFrame:
+        X_transformed = X.copy()
+        poly_features = self.poly.transform(X[self.features])
+        feature_names = self.poly.get_feature_names_out(self.features)
+        df_poly = pd.DataFrame(poly_features, columns=feature_names, index=X.index)
+
+        # Remove columns that already exist in X to avoid duplicates
+        df_poly = df_poly.drop(columns=self.features, errors='ignore')
+        X_transformed = pd.concat([X_transformed, df_poly], axis=1)
+        return X_transformed
+
+
+class ProductFeaturesTransformer(BaseEstimator, TransformerMixin):
+    """
+    Creates product interaction features between specified pairs of features.
+    """
+
+    def __init__(self, feature_pairs: Optional[List[Tuple[str, str]]] = None):
         """
-        Creates crossed interaction features for specified categorical variable pairs, combining them into a new feature.
+        Initializes the ProductFeaturesTransformer.
 
         Args:
-            df (pd.DataFrame): Input DataFrame containing the categorical features.
-            feature_pairs (list[tuple[str, str]]): List of tuples representing pairs of categorical features to create crossed features.
+            feature_pairs (List[Tuple[str, str]], optional): List of tuples representing feature pairs to create product features.
+                                                             If None, all possible pairs of numeric features are used.
+        """
+        self.feature_pairs = feature_pairs
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'ProductFeaturesTransformer':
+        """
+        Fits the transformer to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
 
         Returns:
-            pd.DataFrame: DataFrame containing the original features and newly created crossed features.
+            self
         """
-        for (f1, f2) in feature_pairs:
-            df[f'{f1}_{f2}_crossed'] = df[f1].astype(str) + '_' + df[f2].astype(str)
-        return df
+        if self.feature_pairs is None:
+            numeric_features = X.select_dtypes(include=[np.number]).columns.tolist()
+            self.feature_pairs = [
+                (f1, f2) for i, f1 in enumerate(numeric_features)
+                for f2 in numeric_features[i + 1:]
+            ]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame by adding product features.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with product features added.
+        """
+        X_transformed = X.copy()
+        for (f1, f2) in self.feature_pairs:
+            if f1 in X.columns and f2 in X.columns:
+                X_transformed[f'{f1}_x_{f2}'] = X[f1] * X[f2]
+            else:
+                raise ValueError(f"Features '{f1}' and/or '{f2}' not found in DataFrame.")
+        return X_transformed
+
+
+class ArithmeticCombinationsTransformer(BaseEstimator, TransformerMixin):
+    """
+    Generates arithmetic combination features for specified feature pairs.
+    """
+
+    def __init__(
+        self,
+        feature_pairs: Optional[List[Tuple[str, str]]] = None,
+        operations: Optional[List[str]] = None
+    ):
+        """
+        Initializes the ArithmeticCombinationsTransformer.
+
+        Args:
+            feature_pairs (List[Tuple[str, str]], optional): List of tuples representing feature pairs for arithmetic combinations.
+                                                             If None, all possible pairs of numeric features are used.
+            operations (List[str], optional): List of arithmetic operations to apply. Options are 'add', 'subtract', 'multiply', 'divide'.
+                                              Default is ['add', 'subtract'].
+        """
+        self.feature_pairs = feature_pairs
+        self.operations = operations or ['add', 'subtract']
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'ArithmeticCombinationsTransformer':
+        """
+        Fits the transformer to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            self
+        """
+        if self.feature_pairs is None:
+            numeric_features = X.select_dtypes(include=[np.number]).columns.tolist()
+            self.feature_pairs = [
+                (f1, f2) for i, f1 in enumerate(numeric_features)
+                for f2 in numeric_features[i + 1:]
+            ]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame by adding arithmetic combination features.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with arithmetic combination features added.
+        """
+        X_transformed = X.copy()
+        for (f1, f2) in self.feature_pairs:
+            if f1 not in X.columns or f2 not in X.columns:
+                raise ValueError(f"Features '{f1}' and/or '{f2}' not found in DataFrame.")
+            if 'add' in self.operations:
+                X_transformed[f'{f1}_plus_{f2}'] = X[f1] + X[f2]
+            if 'subtract' in self.operations:
+                X_transformed[f'{f1}_minus_{f2}'] = X[f1] - X[f2]
+            if 'multiply' in self.operations:
+                X_transformed[f'{f1}_times_{f2}'] = X[f1] * X[f2]
+            if 'divide' in self.operations:
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    division_result = X[f1] / X[f2]
+                    division_result.replace([np.inf, -np.inf], np.nan, inplace=True)
+                    X_transformed[f'{f1}_div_{f2}'] = division_result
+        return X_transformed
+
+
+class CrossedFeaturesTransformer(BaseEstimator, TransformerMixin):
+    """
+    Creates crossed interaction features for specified categorical variable pairs.
+    """
+
+    def __init__(self, feature_pairs: Optional[List[Tuple[str, str]]] = None):
+        """
+        Initializes the CrossedFeaturesTransformer.
+
+        Args:
+            feature_pairs (List[Tuple[str, str]], optional): List of tuples representing pairs of categorical features to create crossed features.
+                                                             If None, all possible pairs of categorical features are used.
+        """
+        self.feature_pairs = feature_pairs
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'CrossedFeaturesTransformer':
+        """
+        Fits the transformer to the data.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+            y (pd.Series, optional): Target variable (not used).
+
+        Returns:
+            self
+        """
+        if self.feature_pairs is None:
+            categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
+            self.feature_pairs = [
+                (f1, f2) for i, f1 in enumerate(categorical_features)
+                for f2 in categorical_features[i + 1:]
+            ]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transforms the input DataFrame by adding crossed features.
+
+        Args:
+            X (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with crossed features added.
+        """
+        X_transformed = X.copy()
+        for (f1, f2) in self.feature_pairs:
+            if f1 not in X.columns or f2 not in X.columns:
+                raise ValueError(f"Features '{f1}' and/or '{f2}' not found in DataFrame.")
+            X_transformed[f'{f1}_{f2}_crossed'] = X[f1].astype(str) + '_' + X[f2].astype(str)
+        return X_transformed

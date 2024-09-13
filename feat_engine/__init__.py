@@ -1,5 +1,3 @@
-# feat_engine/__init__.py
-
 from .operate_dataframe import DataFrameOperator
 from .handle_missing_values import MissingValueHandler
 from .normalize_scaling import ScalingNormalizer
