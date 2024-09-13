@@ -4,6 +4,7 @@ from sklearn.experimental import enable_iterative_imputer  # noqa F401
 from sklearn.impute import SimpleImputer, KNNImputer, IterativeImputer
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.base import RegressorMixin, ClassifierMixin
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
 
 class MissingValueHandler:
@@ -203,21 +204,29 @@ class MissingValueHandler:
         data: pd.DataFrame,
         target_column: str,
         model: Optional[Union[RegressorMixin, ClassifierMixin]] = None,
+        search_type: str = 'grid',  # 'grid' or 'random' for hyperparameter tuning
+        param_grid: Optional[Dict[str, List[Any]]] = None,  # parameters for tuning
+        cv: int = 5,  # number of cross-validation folds
         inplace: bool = False,
         **kwargs: Any
     ) -> pd.DataFrame:
         """
-        Fills missing values in the target column using a machine learning model trained on the other columns.
+        Fills missing values in the target column using a machine learning model trained on the other columns,
+        with hyperparameter tuning using cross-validation.
 
         Args:
             data (pd.DataFrame): The input DataFrame.
             target_column (str): The name of the column with missing values to impute.
-            model (Union[RegressorMixin, ClassifierMixin], optional): The machine learning model to use. If None, RandomForestRegressor or RandomForestClassifier is used.
-            inplace (bool, optional): If True, perform operation in-place.
+            model (Union[RegressorMixin, ClassifierMixin], optional): The machine learning model to use.
+                If None, RandomForestRegressor or RandomForestClassifier is used.
+            search_type (str): Type of search for hyperparameter tuning ('grid' or 'random').
+            param_grid (Dict[str, List[Any]], optional): The hyperparameter grid for tuning.
+            cv (int): Number of cross-validation folds for hyperparameter tuning.
+            inplace (bool): If True, perform operation in-place.
             **kwargs: Additional keyword arguments to pass to the model.
 
         Returns:
-            pd.DataFrame: The DataFrame with missing values in the target column filled using the model.
+            pd.DataFrame: The DataFrame with missing values in the target column filled using the tuned model.
         """
         if not inplace:
             data = data.copy()
@@ -238,14 +247,29 @@ class MissingValueHandler:
         X_train_encoded = X_full_encoded.iloc[:len(X_train)]
         X_predict_encoded = X_full_encoded.iloc[len(X_train):]
 
+        # Default model if not provided
         if y_train.dtype.kind in 'biufc':
             model = model or RandomForestRegressor(**kwargs)
         else:
             model = model or RandomForestClassifier(**kwargs)
 
-        model.fit(X_train_encoded, y_train)
-        predicted_values = model.predict(X_predict_encoded)
+        # Perform hyperparameter tuning
+        if param_grid:
+            if search_type == 'grid':
+                search = GridSearchCV(model, param_grid, cv=cv)
+            elif search_type == 'random':
+                search = RandomizedSearchCV(model, param_grid, cv=cv, n_iter=kwargs.get('n_iter', 10))
+            else:
+                raise ValueError("search_type must be either 'grid' or 'random'")
 
+            search.fit(X_train_encoded, y_train)
+            best_model = search.best_estimator_
+        else:
+            best_model = model
+            best_model.fit(X_train_encoded, y_train)
+
+        # Impute missing values with the best model
+        predicted_values = best_model.predict(X_predict_encoded)
         data.loc[data[target_column].isnull(), target_column] = predicted_values
         return data
 
