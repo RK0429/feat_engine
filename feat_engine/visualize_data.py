@@ -513,7 +513,7 @@ class DataVisualizer:
         plt.ylabel(y)
         plt.show()
 
-    def plot_boxplot_categorical(self, df: pd.DataFrame, x: Optional[str] = None, y: str = None, hue: Optional[str] = None, max_unique: int = 10) -> None:
+    def plot_boxplot_categorical(self, df: pd.DataFrame, x: Optional[str] = None, y: str | None = None, hue: Optional[str] = None, max_unique: int = 10) -> None:
         """
         Create a boxplot to visualize the distribution of a numerical feature across different categories. If no x column is specified, applies to all categorical columns with limited unique values.
 
@@ -533,7 +533,7 @@ class DataVisualizer:
         if x:
             columns = [x]
         else:
-            columns = [col for col in df.columns if df[col].nunique() <= max_unique and df[col].dtype == 'object']
+            columns = [col for col in df.columns if df[col].nunique() <= max_unique]
 
         for col in columns:
             plt.figure(figsize=(10, 6))
@@ -559,7 +559,7 @@ class DataVisualizer:
         if column:
             columns = [column]
         else:
-            columns = [col for col in df.columns if df[col].nunique() <= max_unique and df[col].dtype == 'object']
+            columns = [col for col in df.columns if df[col].nunique() <= max_unique]
 
         for col in columns:
             plt.figure(figsize=(8, 6))
@@ -586,7 +586,7 @@ class DataVisualizer:
         if col1 and col2:
             columns = [(col1, col2)]
         else:
-            categorical_columns = [col for col in df.columns if df[col].nunique() <= max_unique and df[col].dtype == 'object']
+            categorical_columns = [col for col in df.columns if df[col].nunique() <= max_unique]
             columns = [(cat1, cat2) for i, cat1 in enumerate(categorical_columns) for cat2 in categorical_columns[i + 1:]]
 
         for (c1, c2) in columns:
