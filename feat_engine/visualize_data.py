@@ -536,7 +536,7 @@ class DataVisualizer:
             y = df.select_dtypes(include=[np.number]).columns.tolist()
         elif isinstance(y, str):
             y = [y]
-        combinations_xy = [(xi, yi) for xi in x for yi in y]
+        combinations_xy = [(xi, yi) for xi in x for yi in y if xi != yi]
         for xi, yi in combinations_xy:
             plt.figure(figsize=(10, 6))
             sns.barplot(x=xi, y=yi, hue=hue, data=df, errorbar=None)
@@ -569,7 +569,7 @@ class DataVisualizer:
             y = [y]
 
         # Create all combinations of x and y
-        combinations_xy = [(xi, yi) for xi in x for yi in y]
+        combinations_xy = [(xi, yi) for xi in x for yi in y if xi != yi]
 
         # Plot boxplots
         for xi, yi in combinations_xy:
