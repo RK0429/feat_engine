@@ -155,7 +155,14 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
         """
         if self.selected_features_ is None:
             raise ValueError("The model has not been fitted yet!")
-        return X.loc[:, self.selected_features_]
+
+        # Perform transformation
+        transformed_X = self.selector.transform(X)  # type: ignore
+
+        # Convert the result back to a DataFrame with selected feature names
+        transformed_df = pd.DataFrame(transformed_X, columns=self.selected_features_, index=X.index)
+
+        return transformed_df
 
     def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
         """
@@ -320,8 +327,18 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             pd.DataFrame: The transformed feature matrix containing only the selected features.
         """
         if self.best_estimator_ is None:
-            raise NotFittedError("This AutomatedFeatureSelector instance is not fitted yet.")
-        return self.best_estimator_.named_steps['selector'].transform(X)
+            raise NotFittedError("This AutoFeatureSelector instance is not fitted yet.")
+
+        # Perform transformation
+        transformed_X = self.best_estimator_.named_steps['selector'].transform(X)
+
+        # Retrieve the selected feature names
+        selected_feature_names = self.get_feature_names_out(input_features=X.columns.tolist())
+
+        # Convert the result back to a DataFrame
+        transformed_df = pd.DataFrame(transformed_X, columns=selected_feature_names, index=X.index)
+
+        return transformed_df
 
     def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
         """
