@@ -81,7 +81,7 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
                 self.encoders[column] = ('label', encoder)
             elif method == 'one_hot':
                 encoder = OneHotEncoder(
-                    sparse=False,
+                    sparse_output=False,
                     drop='first' if self.drop_first else None,
                     handle_unknown='ignore'
                 )
