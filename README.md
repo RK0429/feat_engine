@@ -113,6 +113,10 @@ import matplotlib
 matplotlib.use('Agg')
 ```
 
+## Documentation
+
+For more information on the package, see [Read The Docs](https://feat-engine.readthedocs.io/en/latest/).
+
 ## Contributing
 
 Contributions are welcome! Feel free to open issues or submit pull requests.
