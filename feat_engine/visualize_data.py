@@ -470,7 +470,15 @@ class DataVisualizer:
         fig.show()
 
     # 7. Interactive Scatter Plots
-    def plot_interactive_scatter(self, df: pd.DataFrame, x: Optional[List[str]] = None, y: Optional[List[str]] = None, color: Optional[str] = None, size: Optional[str] = None) -> None:
+    def plot_interactive_scatter(
+        self,
+        df: pd.DataFrame,
+        x: Optional[List[str]] = None,
+        y: Optional[List[str]] = None,
+        color: Optional[str] = None,
+        size: Optional[str] = None,
+        max_unique: int = 10
+    ) -> None:
         """
         Create interactive scatter plots for all possible combinations of x and y columns.
 
@@ -480,8 +488,9 @@ class DataVisualizer:
             y (List[str], optional): Y-axis column(s).
             color (str, optional): Column for color encoding.
             size (str, optional): Column for size encoding.
+            max_unique (int): Maximum number of unique values to consider a column categorical.
         """
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        numeric_cols = [col for col in df.select_dtypes(include=[np.number]).columns if df[col].nunique() > max_unique]
         if x is None:
             x = numeric_cols
         elif isinstance(x, str):
