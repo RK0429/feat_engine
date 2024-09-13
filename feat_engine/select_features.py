@@ -12,7 +12,7 @@ from sklearn.feature_selection import (
     VarianceThreshold,
     SelectFromModel,
 )
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, Lasso
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
@@ -273,7 +273,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         ])
 
         # Define parameter grid including different feature selection methods and their parameters
-        param_grid = self._get_param_grid()
+        param_grid = self._get_param_grid(X)
 
         # Choose the search method
         if self.search_type == 'grid':
@@ -369,41 +369,59 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         support = self.get_support(indices=True)
         return [input_features[i] for i in support]
 
-    def _get_param_grid(self) -> List[Dict[str, Any]] | Dict[str, Any]:
+    def _get_param_grid(self, X: pd.DataFrame) -> List[Dict[str, Any]] | Dict[str, Any]:
         """
-        Generates the parameter grid for hyperparameter optimization.
+        Generates the parameter grid for hyperparameter optimization based on the number of features in X.
+
+        Args:
+            X (pd.DataFrame): The input data to determine the number of features.
 
         Returns:
             Dict[str, Any]: The parameter grid.
         """
-        if self.param_distributions is not None:
-            return self.param_distributions
+        # Create the dynamic range for 'k' using np.linspace
+        k_values = np.linspace(5, len(X.columns), 5, dtype=int).tolist()  # 5 evenly spaced values between 5 and the number of columns
 
-        # Define default parameter grid
+        # Define default parameter grid for classification and regression problems
         if self.problem_type == 'classification':
             param_grid = [
                 # SelectKBest with chi2
                 {
                     'selector': [SelectKBest()],
                     'selector__score_func': [chi2],
-                    'selector__k': [5, 10, 'all'],
+                    'selector__k': k_values,
                 },
                 # SelectKBest with f_classif
                 {
                     'selector': [SelectKBest()],
                     'selector__score_func': [f_classif],
-                    'selector__k': [5, 10, 'all'],
+                    'selector__k': k_values,
                 },
                 # SelectKBest with mutual_info_classif
                 {
                     'selector': [SelectKBest()],
                     'selector__score_func': [mutual_info_classif],
-                    'selector__k': [5, 10, 'all'],
+                    'selector__k': k_values,
                 },
                 # VarianceThreshold
                 {
                     'selector': [VarianceThreshold()],
                     'selector__threshold': [0, 0.01, 0.1],
+                },
+                # Recursive Feature Elimination (RFE) with LogisticRegression
+                {
+                    'selector': [RFE(estimator=LogisticRegression(solver='liblinear'))],
+                    'selector__n_features_to_select': k_values,
+                },
+                # Recursive Feature Elimination (RFE) with LogisticRegression (L1 normalization)
+                {
+                    'selector': [RFE(estimator=LogisticRegression(penalty='l1', solver='liblinear'))],
+                    'selector__n_features_to_select': k_values,
+                },
+                # Recursive Feature Elimination (RFE) with RandomForestClassifier
+                {
+                    'selector': [RFE(estimator=RandomForestClassifier(random_state=self.random_state))],
+                    'selector__n_features_to_select': k_values,
                 },
                 # SelectFromModel with LogisticRegression
                 {
@@ -415,25 +433,41 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                     'selector': [SelectFromModel(RandomForestClassifier(random_state=self.random_state))],
                     'selector__threshold': ['mean', 'median', -np.inf],
                 },
+                # SelectFromModel with GradientBoostingClassifier
+                {
+                    'selector': [SelectFromModel(estimator=GradientBoostingClassifier(random_state=self.random_state))],
+                    'selector__threshold': ['mean', 'median', -np.inf],
+                },
             ]
         else:
+            # Regression
             param_grid = [
                 # SelectKBest with f_regression
                 {
                     'selector': [SelectKBest()],
                     'selector__score_func': [f_regression],
-                    'selector__k': [5, 10, 'all'],
+                    'selector__k': k_values,
                 },
                 # SelectKBest with mutual_info_regression
                 {
                     'selector': [SelectKBest()],
                     'selector__score_func': [mutual_info_regression],
-                    'selector__k': [5, 10, 'all'],
+                    'selector__k': k_values,
                 },
                 # VarianceThreshold
                 {
                     'selector': [VarianceThreshold()],
                     'selector__threshold': [0, 0.01, 0.1],
+                },
+                # Recursive Feature Elimination (RFE) with Lasso
+                {
+                    'selector': [RFE(estimator=Lasso(random_state=self.random_state))],
+                    'selector__n_features_to_select': k_values,
+                },
+                # Recursive Feature Elimination (RFE) with RandomForestRegressor
+                {
+                    'selector': [RFE(estimator=RandomForestRegressor(random_state=self.random_state))],
+                    'selector__n_features_to_select': k_values,
                 },
                 # SelectFromModel with Lasso
                 {
@@ -443,6 +477,11 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # SelectFromModel with RandomForestRegressor
                 {
                     'selector': [SelectFromModel(RandomForestRegressor(random_state=self.random_state))],
+                    'selector__threshold': ['mean', 'median', -np.inf],
+                },
+                # SelectFromModel with GradientBoostingRegressor
+                {
+                    'selector': [SelectFromModel(estimator=GradientBoostingRegressor(random_state=self.random_state))],
                     'selector__threshold': ['mean', 'median', -np.inf],
                 },
             ]
