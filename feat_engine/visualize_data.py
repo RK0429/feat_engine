@@ -513,73 +513,90 @@ class DataVisualizer:
         plt.ylabel(y)
         plt.show()
 
-    def plot_boxplot_categorical(self, df: pd.DataFrame, x: str, y: str, hue: Optional[str] = None) -> None:
+    def plot_boxplot_categorical(self, df: pd.DataFrame, x: Optional[str] = None, y: str = None, hue: Optional[str] = None, max_unique: int = 10) -> None:
         """
-        Create a boxplot to visualize the distribution of a numerical feature across different categories.
+        Create a boxplot to visualize the distribution of a numerical feature across different categories. If no x column is specified, applies to all categorical columns with limited unique values.
 
         Args:
             df (pd.DataFrame): Input dataframe.
-            x (str): The categorical feature to plot on the x-axis.
+            x (str, optional): The categorical feature to plot on the x-axis. If None, the function will apply to all columns with `max_unique` unique values or less.
             y (str): The numerical feature to plot on the y-axis.
             hue (str, optional): Column name for adding a hue to the plot.
+            max_unique (int): Maximum number of unique values to consider a column categorical. Default is 10.
 
         Raises:
-            ValueError: If x or y is not in dataframe.
+            ValueError: If y or any specified x is not in dataframe.
         """
-        for col in [x, y]:
-            if col not in df.columns:
-                raise ValueError(f"Column '{col}' not found in dataframe.")
-        plt.figure(figsize=(10, 6))
-        sns.boxplot(x=x, y=y, hue=hue, data=df)
-        plt.title(f'Boxplot of {y} by {x}')
-        plt.xlabel(x)
-        plt.ylabel(y)
-        plt.show()
+        if y not in df.columns:
+            raise ValueError(f"Column '{y}' not found in dataframe.")
 
-    def plot_categorical_distribution(self, df: pd.DataFrame, column: str, hue: Optional[str] = None) -> None:
+        if x:
+            columns = [x]
+        else:
+            columns = [col for col in df.columns if df[col].nunique() <= max_unique and df[col].dtype == 'object']
+
+        for col in columns:
+            plt.figure(figsize=(10, 6))
+            sns.boxplot(x=col, y=y, hue=hue, data=df)
+            plt.title(f'Boxplot of {y} by {col}')
+            plt.xlabel(col)
+            plt.ylabel(y)
+            plt.show()
+
+    def plot_categorical_distribution(self, df: pd.DataFrame, column: Optional[str] = None, hue: Optional[str] = None, max_unique: int = 10) -> None:
         """
-        Plot the distribution of a categorical feature.
+        Plot the distribution of a categorical feature. If no column is specified, applies to all categorical columns with a limited number of unique values.
 
         Args:
             df (pd.DataFrame): Input dataframe.
-            column (str): Name of the categorical column.
+            column (str, optional): Name of the categorical column. If None, the function will apply to all columns with `max_unique` unique values or less.
             hue (str, optional): Column name for adding a hue to the plot.
+            max_unique (int): Maximum number of unique values to consider a column categorical. Default is 10.
 
         Raises:
             ValueError: If column is not in dataframe.
         """
-        if column not in df.columns:
-            raise ValueError(f"Column '{column}' not found in dataframe.")
-        plt.figure(figsize=(8, 6))
-        sns.countplot(x=column, hue=hue, data=df)
-        plt.title(f'Distribution of {column}')
-        plt.xlabel(column)
-        plt.ylabel('Count')
-        plt.xticks(rotation=45)
-        plt.show()
+        if column:
+            columns = [column]
+        else:
+            columns = [col for col in df.columns if df[col].nunique() <= max_unique and df[col].dtype == 'object']
 
-    def plot_categorical_heatmap(self, df: pd.DataFrame, col1: str, col2: str) -> None:
+        for col in columns:
+            plt.figure(figsize=(8, 6))
+            sns.countplot(x=col, hue=hue, data=df)
+            plt.title(f'Distribution of {col}')
+            plt.xlabel(col)
+            plt.ylabel('Count')
+            plt.xticks(rotation=45)
+            plt.show()
+
+    def plot_categorical_heatmap(self, df: pd.DataFrame, col1: Optional[str] = None, col2: Optional[str] = None, max_unique: int = 10) -> None:
         """
-        Create a heatmap to visualize the frequency of co-occurrences between two categorical features.
+        Create a heatmap for visualizing the frequency of co-occurrences between two categorical features. If no columns are specified, uses all pairs of categorical columns with limited unique values.
 
         Args:
             df (pd.DataFrame): Input dataframe.
-            col1 (str): Name of the first categorical column.
-            col2 (str): Name of the second categorical column.
+            col1 (str, optional): Name of the first categorical column.
+            col2 (str, optional): Name of the second categorical column.
+            max_unique (int): Maximum number of unique values to consider a column categorical. Default is 10.
 
         Raises:
             ValueError: If col1 or col2 is not in dataframe.
         """
-        for col in [col1, col2]:
-            if col not in df.columns:
-                raise ValueError(f"Column '{col}' not found in dataframe.")
-        crosstab = pd.crosstab(df[col1], df[col2])
-        plt.figure(figsize=(10, 6))
-        sns.heatmap(crosstab, annot=True, fmt='d', cmap='Blues')
-        plt.title(f'Heatmap of {col1} vs {col2}')
-        plt.xlabel(col2)
-        plt.ylabel(col1)
-        plt.show()
+        if col1 and col2:
+            columns = [(col1, col2)]
+        else:
+            categorical_columns = [col for col in df.columns if df[col].nunique() <= max_unique and df[col].dtype == 'object']
+            columns = [(cat1, cat2) for i, cat1 in enumerate(categorical_columns) for cat2 in categorical_columns[i + 1:]]
+
+        for (c1, c2) in columns:
+            crosstab = pd.crosstab(df[c1], df[c2])
+            plt.figure(figsize=(10, 6))
+            sns.heatmap(crosstab, annot=True, fmt='d', cmap='Blues')
+            plt.title(f'Heatmap of {c1} vs {c2}')
+            plt.xlabel(c2)
+            plt.ylabel(c1)
+            plt.show()
 
     # 10. Plot Target Distribution
     def plot_target_distribution(self, df: pd.DataFrame, target_column: str) -> None:
