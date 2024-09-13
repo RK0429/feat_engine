@@ -114,6 +114,7 @@ class DataVisualizer:
         x: Optional[List[str]] = None,
         y: Optional[List[str]] = None,
         hue: Optional[str] = None,
+        marker_size: int = 5,
         max_unique: int = 10
     ) -> None:
         """
@@ -124,6 +125,7 @@ class DataVisualizer:
             x (List[str], optional): The categorical feature(s) to plot on the x-axis.
             y (List[str], optional): The numerical feature(s) to plot on the y-axis.
             hue (str, optional): Column name for adding a hue to the plot.
+            marker_size (int): Marker size of the plot.
             max_unique (int): Maximum number of unique values to consider a column categorical.
         """
         # Determine categorical and numerical columns
@@ -145,7 +147,7 @@ class DataVisualizer:
             if yi not in df.columns:
                 raise ValueError(f"Column '{yi}' not found in dataframe.")
             plt.figure(figsize=(10, 6))
-            sns.swarmplot(x=xi, y=yi, hue=hue, data=df)
+            sns.swarmplot(x=xi, y=yi, hue=hue, data=df, size=marker_size)
             plt.title(f'Swarmplot of {yi} by {xi}')
             plt.xlabel(xi)
             plt.ylabel(yi)
