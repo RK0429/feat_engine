@@ -380,7 +380,9 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             Dict[str, Any]: The parameter grid.
         """
         # Create the dynamic range for 'k' using np.linspace
-        k_values = np.linspace(5, len(X.columns), 5, dtype=int).tolist()  # 5 evenly spaced values between 5 and the number of columns
+        num_columns = len(X.columns)
+        step = num_columns // 5
+        k_values = np.arange(5, num_columns, step, dtype=int)
 
         # Define default parameter grid for classification and regression problems
         if self.problem_type == 'classification':
