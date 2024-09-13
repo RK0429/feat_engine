@@ -108,7 +108,14 @@ class DataVisualizer:
         plt.title(f"Correlation Heatmap ({method.capitalize()})")
         plt.show()
 
-    def plot_swarmplot(self, df: pd.DataFrame, x: Optional[List[str]] = None, y: Optional[List[str]] = None, hue: Optional[str] = None) -> None:
+    def plot_swarmplot(
+        self,
+        df: pd.DataFrame,
+        x: Optional[List[str]] = None,
+        y: Optional[List[str]] = None,
+        hue: Optional[str] = None,
+        max_unique: int = 10
+    ) -> None:
         """
         Create a swarmplot to visualize the distribution of data points across different categories.
 
@@ -117,10 +124,11 @@ class DataVisualizer:
             x (List[str], optional): The categorical feature(s) to plot on the x-axis.
             y (List[str], optional): The numerical feature(s) to plot on the y-axis.
             hue (str, optional): Column name for adding a hue to the plot.
+            max_unique (int): Maximum number of unique values to consider a column categorical.
         """
         # Determine categorical and numerical columns
-        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-        numerical_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = [col for col in df.columns if df[col].nunique() <= max_unique]
+        numerical_cols = [col for col in df.select_dtypes(include=[np.number]).columns if df[col].nunique() > max_unique]
         if x is None:
             x = categorical_cols
         elif isinstance(x, str):
@@ -130,7 +138,7 @@ class DataVisualizer:
         elif isinstance(y, str):
             y = [y]
         # Generate all possible combinations of x and y
-        combinations_xy = [(xi, yi) for xi in x for yi in y]
+        combinations_xy = [(xi, yi) for xi in x for yi in y if xi != yi]
         for xi, yi in combinations_xy:
             if xi not in df.columns:
                 raise ValueError(f"Column '{xi}' not found in dataframe.")
