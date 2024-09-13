@@ -660,9 +660,9 @@ class ClassificationSolver:
 
     def cross_validate_model(
         self, model_name: str, X: pd.DataFrame, y: pd.Series, cv: int = 5
-    ) -> Dict[str, float]:
+    ) -> Dict[str, Any]:
         """
-        Cross-validates the model using the specified number of folds.
+        Cross-validates the model using the specified number of folds and returns detailed metrics.
 
         Args:
             model_name (str): The name of the model to cross-validate.
@@ -671,18 +671,31 @@ class ClassificationSolver:
             cv (int): Number of cross-validation folds.
 
         Returns:
-            Dict[str, float]: Cross-validation scores (mean and standard deviation of accuracy).
+            Dict[str, Any]: Cross-validation metrics including accuracy, precision, recall, f1, ROC AUC, etc.
         """
         model = self.models[model_name]
         self.logger.info(f"Cross-validating model: {model_name}")
+
+        # Define stratified cross-validation
         cv_strategy = StratifiedKFold(n_splits=cv, shuffle=True, random_state=self.random_state)
-        scores = cross_val_score(
-            model, X, y, cv=cv_strategy, scoring="accuracy", n_jobs=-1
-        )
-        return {
-            "mean_accuracy": float(np.mean(scores)),
-            "std_accuracy": float(np.std(scores)),
-        }
+
+        # Store metrics for each fold
+        scoring_metrics = ["accuracy", "precision_weighted", "recall_weighted", "f1_weighted", "roc_auc", "neg_log_loss"]
+
+        # Perform cross-validation for all required metrics
+        scores = {}
+        for metric in scoring_metrics:
+            self.logger.info(f"Calculating {metric}...")
+            score = cross_val_score(
+                model, X, y, cv=cv_strategy, scoring=metric, n_jobs=-1
+            )
+            scores[metric] = {
+                "mean": float(np.mean(score)),
+                "std": float(np.std(score)),
+            }
+
+        # Return detailed cross-validation results
+        return scores
 
     def plot_feature_importance(
         self, model: BaseEstimator, feature_names: List[str]
