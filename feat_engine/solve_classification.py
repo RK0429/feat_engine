@@ -86,7 +86,7 @@ class ClassificationSolver:
                 random_state=self.random_state
             ),
             "Support Vector Machine": SVC(
-                probability=True, random_state=self.random_state
+                probability=True, random_state=self.random_state, max_iter=10000
             ),
             "K-Nearest Neighbors": KNeighborsClassifier(),
             "Decision Tree": DecisionTreeClassifier(random_state=self.random_state),
