@@ -180,6 +180,15 @@ class ClassificationSolver:
             "Naive Bayes": {
                 "var_smoothing": np.logspace(0, -9, num=100),
             },
+            "Voting Classifier": {
+                "voting": ["soft", "hard"],
+                "weights": [
+                    [1, 1, 1],  # Equal weights for LogisticRegression, RandomForest, SVC
+                    [2, 1, 1],  # Favor LogisticRegression more
+                    [1, 2, 1],  # Favor RandomForest more
+                    [1, 1, 2],  # Favor SVC more
+                ],
+            },
         }
 
     @staticmethod
