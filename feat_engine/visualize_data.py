@@ -39,6 +39,7 @@ class DataVisualizer:
     - plot_categorical_distribution: Plot the distribution of a categorical feature.
     - plot_categorical_heatmap: Create a heatmap for co-occurrences between two categorical features.
     - plot_target_distribution: Plot the distribution of a target variable.
+    - **display_basic_data**: Display basic data such as the number of unique elements in each column and the number of missing values.
     """
 
     def __init__(self) -> None:
@@ -604,3 +605,18 @@ class DataVisualizer:
         plt.title(f'Target Distribution: {target_column}')
         plt.xlabel(target_column)
         plt.show()
+
+    def display_basic_data(self, df: pd.DataFrame) -> None:
+        """
+        Display basic data such as the number of unique elements in each column and the number of missing values.
+
+        Args:
+            df (pd.DataFrame): Input dataframe.
+        """
+        summary_df = pd.DataFrame({
+            'Unique Values': df.nunique(),
+            'Missing Values': df.isnull().sum(),
+            'Data Type': df.dtypes
+        })
+        summary_df = summary_df.reset_index().rename(columns={'index': 'Column'})
+        print(summary_df)
