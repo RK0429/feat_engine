@@ -169,6 +169,79 @@ class RegressionSolver:
             },
         }
 
+    def _default_bayesian_search_spaces(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Provides fine-grained default search spaces for Bayesian optimization for each regression model.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: A dictionary of parameter distributions suitable for Optuna.
+        """
+        return {
+            "Ridge Regression": {
+                "alpha": optuna.distributions.LogUniformDistribution(1e-4, 1e4),
+                "solver": optuna.distributions.CategoricalDistribution(["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"]),
+            },
+            "Lasso Regression": {
+                "alpha": optuna.distributions.LogUniformDistribution(1e-4, 1e1),
+                "selection": optuna.distributions.CategoricalDistribution(["cyclic", "random"]),
+            },
+            "ElasticNet Regression": {
+                "alpha": optuna.distributions.LogUniformDistribution(1e-4, 1e1),
+                "l1_ratio": optuna.distributions.FloatUniformDistribution(0.0, 1.0),
+            },
+            "Decision Tree": {
+                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
+                "min_samples_split": optuna.distributions.IntUniformDistribution(2, 20),
+                "min_samples_leaf": optuna.distributions.IntUniformDistribution(1, 20),
+                "criterion": optuna.distributions.CategoricalDistribution(["squared_error", "friedman_mse", "absolute_error", "poisson"]),
+            },
+            "Random Forest": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
+                "min_samples_split": optuna.distributions.IntUniformDistribution(2, 20),
+                "min_samples_leaf": optuna.distributions.IntUniformDistribution(1, 20),
+                "bootstrap": optuna.distributions.CategoricalDistribution([True, False]),
+            },
+            "Gradient Boosting": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "max_depth": optuna.distributions.IntUniformDistribution(3, 20),
+                "subsample": optuna.distributions.FloatUniformDistribution(0.5, 1.0),
+            },
+            "AdaBoost": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "loss": optuna.distributions.CategoricalDistribution(["linear", "square", "exponential"]),
+            },
+            "Support Vector Regressor": {
+                "C": optuna.distributions.LogUniformDistribution(1e-3, 1e3),
+                "kernel": optuna.distributions.CategoricalDistribution(["linear", "rbf", "poly", "sigmoid"]),
+                "gamma": optuna.distributions.CategoricalDistribution(["scale", "auto"]),
+                "epsilon": optuna.distributions.FloatUniformDistribution(0.0, 1.0),
+            },
+            "XGBoost": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "max_depth": optuna.distributions.IntUniformDistribution(3, 20),
+                "subsample": optuna.distributions.FloatUniformDistribution(0.5, 1.0),
+                "colsample_bytree": optuna.distributions.FloatUniformDistribution(0.5, 1.0),
+            },
+            "LightGBM": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "num_leaves": optuna.distributions.IntUniformDistribution(20, 150),
+                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
+            },
+            "CatBoost": {
+                "iterations": optuna.distributions.IntUniformDistribution(100, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "depth": optuna.distributions.IntUniformDistribution(3, 16),
+                "l2_leaf_reg": optuna.distributions.IntUniformDistribution(1, 10),
+                "border_count": optuna.distributions.IntUniformDistribution(32, 256),
+                "bagging_temperature": optuna.distributions.FloatUniformDistribution(0.0, 5.0),
+            },
+        }
+
     @staticmethod
     def _setup_logger() -> logging.Logger:
         """
@@ -382,15 +455,15 @@ class RegressionSolver:
         model = self.models[model_name]
         self.logger.info(f"Performing hyperparameter tuning for {model_name}...")
 
-        if param_grid is None:
-            param_grid = self._default_param_grids().get(model_name, {})
-            if not param_grid:
-                self.logger.warning(
-                    f"No parameter grid available for {model_name}. Skipping tuning."
-                )
-                return
-
         if search_type == "grid":
+            if param_grid is None:
+                param_grid = self._default_param_grids().get(model_name, {})
+                if not param_grid:
+                    self.logger.warning(
+                        f"No parameter grid available for {model_name}. Skipping tuning."
+                    )
+                    return
+
             search = GridSearchCV(
                 model,
                 param_grid,
@@ -405,7 +478,16 @@ class RegressionSolver:
             )
             # Store the tuned model for future use
             self.tuned_models[model_name] = search.best_estimator_
+
         elif search_type == "random":
+            if param_grid is None:
+                param_grid = self._default_param_grids().get(model_name, {})
+                if not param_grid:
+                    self.logger.warning(
+                        f"No parameter grid available for {model_name}. Skipping tuning."
+                    )
+                    return
+
             search = RandomizedSearchCV(
                 model,
                 param_grid,
@@ -422,23 +504,34 @@ class RegressionSolver:
             )
             # Store the tuned model for future use
             self.tuned_models[model_name] = search.best_estimator_
+
         elif search_type == "bayesian":  # Added Bayesian optimization
             self.logger.info(f"Using Bayesian Optimization for {model_name}...")
-            study = optuna.create_study(direction="maximize")
-            func = self._create_objective(model, param_grid, X_train, y_train, cv, scoring)
-            study.optimize(func, n_trials=n_iter)
+            # Retrieve the default Bayesian search spaces
+            bayesian_search_spaces = self._default_bayesian_search_spaces()
+            param_distributions = bayesian_search_spaces.get(model_name, {})
+            if not param_distributions:
+                self.logger.warning(
+                    f"No Bayesian parameter distribution available for {model_name}. Skipping tuning."
+                )
+                return
+
+            study = optuna.create_study(direction="minimize" if 'mse' in scoring else "maximize")
+            func = self._create_objective(model, param_distributions, X_train, y_train, cv, scoring)
+            study.optimize(func, n_trials=n_iter, show_progress_bar=True)
             best_params = study.best_params
             self.logger.info(f"Best parameters found for {model_name}: {best_params}")
             model.set_params(**best_params)
             model.fit(X_train, y_train)
             self.tuned_models[model_name] = model
+
         else:
             raise ValueError("search_type must be either 'grid', 'random', or 'bayesian'.")
 
     def _create_objective(
         self,
         model: BaseEstimator,
-        param_grid: Dict[str, List[Any]],
+        param_distributions: Dict[str, Any],
         X: pd.DataFrame,
         y: pd.Series,
         cv: int,
@@ -449,7 +542,7 @@ class RegressionSolver:
 
         Args:
             model (BaseEstimator): The machine learning model to be optimized.
-            param_grid (Dict[str, List[Any]]): The grid of hyperparameters to search over.
+            param_distributions (Dict[str, Any]): The distributions of hyperparameters to sample from.
             X (pd.DataFrame): Training data for features.
             y (pd.Series): Target labels for training data.
             cv (int): The number of cross-validation folds.
@@ -470,31 +563,34 @@ class RegressionSolver:
                 float: The mean cross-validated score for the suggested hyperparameter set.
             """
             params = {}
-            for param, values in param_grid.items():
-                if isinstance(values, list):
-                    # Categorical or discrete parameters
-                    params[param] = trial.suggest_categorical(param, values)
-                elif isinstance(values, np.ndarray):
-                    # Continuous parameters
-                    params[param] = trial.suggest_float(param, float(values.min()), float(values.max()))
+            for param, distribution in param_distributions.items():
+                if isinstance(distribution, optuna.distributions.CategoricalDistribution):
+                    params[param] = trial.suggest_categorical(param, distribution.choices)
+                elif isinstance(distribution, optuna.distributions.LogUniformDistribution):
+                    params[param] = trial.suggest_loguniform(param, distribution.low, distribution.high)
+                elif isinstance(distribution, optuna.distributions.FloatUniformDistribution):
+                    params[param] = trial.suggest_float(param, distribution.low, distribution.high)
+                elif isinstance(distribution, optuna.distributions.IntUniformDistribution):
+                    params[param] = trial.suggest_int(param, distribution.low, distribution.high)
                 else:
-                    # Handle float or integer ranges
-                    params[param] = trial.suggest_float(param, float(min(values)), float(max(values)))
+                    # Handle other distribution types if necessary
+                    params[param] = trial.suggest_float(param, 0.0, 1.0)
 
             model.set_params(**params)
 
             # Define cross-validation strategy
-            if isinstance(cv, int):
-                cv_strategy = KFold(n_splits=cv, shuffle=True, random_state=self.random_state)
-            else:
-                cv_strategy = cv
+            cv_strategy = KFold(n_splits=cv, shuffle=True, random_state=self.random_state)
 
             # Perform cross-validation
             score = cross_val_score(
                 model, X, y, cv=cv_strategy, scoring=scoring, n_jobs=-1
             ).mean()
 
-            return score
+            # If the scoring is a negative metric (like neg_mean_squared_error), return it as is for minimization
+            if 'neg_' in scoring:
+                return score  # Optuna will minimize this
+            else:
+                return score  # Optuna will maximize this
 
         return objective
 
@@ -517,7 +613,7 @@ class RegressionSolver:
         self.logger.info(
             "Automatically selecting the best model based on cross-validated score..."
         )
-        best_score = float('-inf')  # Initialize to negative infinity
+        best_score = float('inf') if 'neg_' in scoring or 'mse' in scoring or 'mae' in scoring else float('-inf')
         best_model_name = ""
 
         for model_name in self.models:
@@ -538,10 +634,17 @@ class RegressionSolver:
                 f"{model_name} - Mean Score: {mean_score:.4f}, Std: {std_score:.4f}"
             )
 
-            # For scoring metrics where higher is better (e.g., neg_mean_squared_error)
-            if mean_score > best_score:
-                best_score = mean_score
-                best_model_name = model_name
+            # Determine if the current score is better
+            if 'neg_' in scoring or 'mse' in scoring or 'mae' in scoring:
+                # Lower is better
+                if mean_score < best_score:
+                    best_score = mean_score
+                    best_model_name = model_name
+            else:
+                # Higher is better
+                if mean_score > best_score:
+                    best_score = mean_score
+                    best_model_name = model_name
 
         self.logger.info(
             f"Best model selected: {best_model_name} with cross-validated score: {best_score:.4f}"
@@ -581,7 +684,11 @@ class RegressionSolver:
                 }
             )
         results_df = pd.DataFrame(results)
-        results_df.sort_values(by="Mean Score", ascending=False, inplace=True)
+        # For regression, lower scores might be better depending on the metric
+        if 'neg_' in scoring or 'mse' in scoring or 'mae' in scoring:
+            results_df.sort_values(by="Mean Score", ascending=True, inplace=True)
+        else:
+            results_df.sort_values(by="Mean Score", ascending=False, inplace=True)
         self.logger.info("Model comparison results:\n" + results_df.to_string(index=False))
         return results_df
 
@@ -697,7 +804,6 @@ class RegressionSolver:
             y_train (pd.Series): Target variable.
             cv (int): Number of cross-validation folds.
             scoring (str): Scoring metric.
-
         """
         self.logger.info("Plotting learning curve...")
         train_sizes, train_scores, test_scores = learning_curve(
@@ -708,30 +814,53 @@ class RegressionSolver:
             scoring=scoring,
             n_jobs=-1,
             train_sizes=np.linspace(0.1, 1.0, 5),
+            shuffle=True,
             random_state=self.random_state,
         )
         # For negative scoring metrics, convert to positive
-        train_scores_mean = -np.mean(train_scores, axis=1)
-        test_scores_mean = -np.mean(test_scores, axis=1)
+        if 'neg_' in scoring:
+            train_scores_mean = -np.mean(train_scores, axis=1)
+            test_scores_mean = -np.mean(test_scores, axis=1)
+            ylabel = "Error"
+        else:
+            train_scores_mean = np.mean(train_scores, axis=1)
+            test_scores_mean = np.mean(test_scores, axis=1)
+            ylabel = scoring.capitalize()
 
         plt.figure(figsize=(10, 6))
-        plt.plot(
-            train_sizes,
-            train_scores_mean,
-            "o-",
-            color="r",
-            label="Training error",
-        )
-        plt.plot(
-            train_sizes,
-            test_scores_mean,
-            "o-",
-            color="g",
-            label="Cross-validation error",
-        )
+        if 'neg_' in scoring:
+            plt.plot(
+                train_sizes,
+                train_scores_mean,
+                "o-",
+                color="r",
+                label="Training error",
+            )
+            plt.plot(
+                train_sizes,
+                test_scores_mean,
+                "o-",
+                color="g",
+                label="Cross-validation error",
+            )
+        else:
+            plt.plot(
+                train_sizes,
+                train_scores_mean,
+                "o-",
+                color="r",
+                label="Training score",
+            )
+            plt.plot(
+                train_sizes,
+                test_scores_mean,
+                "o-",
+                color="g",
+                label="Cross-validation score",
+            )
         plt.title("Learning Curve")
         plt.xlabel("Training Examples")
-        plt.ylabel("Error")
+        plt.ylabel(ylabel)
         plt.legend(loc="best")
         plt.grid()
         plt.show()
@@ -770,20 +899,24 @@ class RegressionSolver:
         scores = {}
         for metric in scoring:
             self.logger.info(f"Calculating {metric}...")
-            score = cross_val_score(
-                model, X, y, cv=cv_strategy, scoring=metric, n_jobs=-1
-            )
-            # For negative metrics, we convert back to positive values
-            if 'neg_' in metric:
-                scores[metric] = {
-                    "mean": -float(np.mean(score)),
-                    "std": -float(np.std(score)),
-                }
-            else:
-                scores[metric] = {
-                    "mean": float(np.mean(score)),
-                    "std": float(np.std(score)),
-                }
+            try:
+                score = cross_val_score(
+                    model, X, y, cv=cv_strategy, scoring=metric, n_jobs=-1
+                )
+                # For negative metrics, convert back to positive values
+                if 'neg_' in metric:
+                    scores[metric] = {
+                        "mean": -float(np.mean(score)),
+                        "std": -float(np.std(score)),
+                    }
+                else:
+                    scores[metric] = {
+                        "mean": float(np.mean(score)),
+                        "std": float(np.std(score)),
+                    }
+            except ValueError as e:
+                self.logger.warning(f"Skipping metric {metric} due to error: {e}")
+                continue
 
         return scores
 
