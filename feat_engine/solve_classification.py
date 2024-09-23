@@ -143,12 +143,15 @@ class ClassificationSolver:
             "Logistic Regression": {
                 "C": [0.001, 0.01, 0.1, 1, 10, 100],
                 "solver": ["liblinear", "lbfgs", "saga", "newton-cg"],
+                "penalty": ["l1", "l2", "elasticnet", "none"],
+                "l1_ratio": [0.0, 0.5, 1.0],  # Only used if penalty='elasticnet'
             },
             "Random Forest": {
                 "n_estimators": [50, 100, 200, 500],
                 "max_depth": [None, 10, 20, 30, 40],
                 "min_samples_split": [2, 5, 10, 20],
                 "min_samples_leaf": [1, 2, 4],
+                "max_features": ["auto", "sqrt", "log2", 0.1, 0.5, 1.0],
                 "bootstrap": [True, False],
             },
             "Gradient Boosting": {
@@ -156,6 +159,8 @@ class ClassificationSolver:
                 "learning_rate": [0.001, 0.01, 0.1, 0.2],
                 "max_depth": [3, 5, 7, 10, 15],
                 "subsample": [0.8, 0.9, 1.0],
+                "min_samples_split": [2, 5, 10],
+                "min_samples_leaf": [1, 2, 4],
             },
             "Support Vector Machine": {
                 "C": [0.01, 0.1, 1, 10, 100],
@@ -166,29 +171,43 @@ class ClassificationSolver:
                 "n_neighbors": [3, 5, 7, 9, 11, 15],
                 "weights": ["uniform", "distance"],
                 "p": [1, 2],
+                "metric": ["minkowski", "euclidean", "manhattan"],
             },
             "Decision Tree": {
                 "max_depth": [None, 10, 20, 30, 40],
                 "min_samples_split": [2, 5, 10, 20],
                 "min_samples_leaf": [1, 2, 4],
                 "criterion": ["gini", "entropy"],
+                "max_features": ["auto", "sqrt", "log2", 0.1, 0.5, 1.0],
             },
             "XGBoost": {
                 "n_estimators": [50, 100, 200, 500],
                 "learning_rate": [0.001, 0.01, 0.05, 0.1, 0.2],
                 "max_depth": [3, 5, 7, 10, 15],
                 "subsample": [0.7, 0.8, 0.9, 1.0],
+                "colsample_bytree": [0.7, 0.8, 0.9, 1.0],
+                "gamma": [0, 0.1, 0.2, 0.3],
+                "reg_alpha": [0, 0.01, 0.1, 1],
+                "reg_lambda": [1, 1.5, 2, 3],
             },
             "LightGBM": {
                 "n_estimators": [50, 100, 200, 500],
                 "learning_rate": [0.001, 0.01, 0.05, 0.1, 0.2],
                 "num_leaves": [31, 50, 100, 150],
                 "max_depth": [-1, 10, 20, 30],
+                "min_child_samples": [20, 30, 40, 50],
+                "subsample": [0.6, 0.7, 0.8, 0.9, 1.0],
+                "colsample_bytree": [0.6, 0.7, 0.8, 0.9, 1.0],
+                "reg_alpha": [0, 0.01, 0.1, 1],
+                "reg_lambda": [0, 0.01, 0.1, 1],
             },
             "CatBoost": {
                 "iterations": [100, 200, 500],
                 "learning_rate": [0.001, 0.01, 0.1, 0.2],
                 "depth": [3, 5, 7, 10],
+                "l2_leaf_reg": [1, 3, 5, 7, 9],
+                "border_count": [32, 64, 128, 256],
+                "bagging_temperature": [0, 1, 3, 5],
             },
             "Naive Bayes": {
                 "var_smoothing": np.logspace(0, -9, num=100),
@@ -205,6 +224,102 @@ class ClassificationSolver:
             "Stacking Classifier": {  # Added parameter grid for StackingClassifier
                 "final_estimator__C": [0.01, 0.1, 1, 10],
                 "final_estimator__solver": ["lbfgs", "liblinear"],
+                "final_estimator__penalty": ["l2"],
+            },
+        }
+
+    def _default_bayesian_search_spaces(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Provides fine-grained default search spaces for Bayesian optimization for each model.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: A dictionary of parameter distributions suitable for Optuna.
+        """
+        return {
+            "Logistic Regression": {
+                "C": optuna.distributions.LogUniformDistribution(1e-4, 1e4),
+                "solver": optuna.distributions.CategoricalDistribution(["liblinear", "lbfgs", "saga", "newton-cg"]),
+                "penalty": optuna.distributions.CategoricalDistribution(["l1", "l2", "elasticnet", "none"]),
+                "l1_ratio": optuna.distributions.FloatDistribution(0.0, 1.0),
+            },
+            "Random Forest": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(10, 1000),
+                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
+                "min_samples_split": optuna.distributions.IntUniformDistribution(2, 20),
+                "min_samples_leaf": optuna.distributions.IntUniformDistribution(1, 20),
+                "max_features": optuna.distributions.CategoricalDistribution(["auto", "sqrt", "log2"]),
+            },
+            "Gradient Boosting": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "max_depth": optuna.distributions.IntUniformDistribution(3, 20),
+                "subsample": optuna.distributions.FloatDistribution(0.5, 1.0),
+                "min_samples_split": optuna.distributions.IntUniformDistribution(2, 20),
+                "min_samples_leaf": optuna.distributions.IntUniformDistribution(1, 20),
+            },
+            "Support Vector Machine": {
+                "C": optuna.distributions.LogUniformDistribution(1e-4, 1e4),
+                "kernel": optuna.distributions.CategoricalDistribution(["linear", "rbf", "poly", "sigmoid"]),
+                "gamma": optuna.distributions.CategoricalDistribution(["scale", "auto"]),
+            },
+            "K-Nearest Neighbors": {
+                "n_neighbors": optuna.distributions.IntUniformDistribution(1, 30),
+                "weights": optuna.distributions.CategoricalDistribution(["uniform", "distance"]),
+                "p": optuna.distributions.IntUniformDistribution(1, 2),
+                "metric": optuna.distributions.CategoricalDistribution(["minkowski", "euclidean", "manhattan"]),
+            },
+            "Decision Tree": {
+                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
+                "min_samples_split": optuna.distributions.IntUniformDistribution(2, 20),
+                "min_samples_leaf": optuna.distributions.IntUniformDistribution(1, 20),
+                "criterion": optuna.distributions.CategoricalDistribution(["gini", "entropy"]),
+                "max_features": optuna.distributions.CategoricalDistribution(["auto", "sqrt", "log2"]),
+            },
+            "XGBoost": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "max_depth": optuna.distributions.IntUniformDistribution(1, 20),
+                "subsample": optuna.distributions.FloatDistribution(0.5, 1.0),
+                "colsample_bytree": optuna.distributions.FloatDistribution(0.5, 1.0),
+                "gamma": optuna.distributions.FloatDistribution(0.0, 5.0),
+                "reg_alpha": optuna.distributions.FloatDistribution(0.0, 5.0),
+                "reg_lambda": optuna.distributions.FloatDistribution(1.0, 5.0),
+            },
+            "LightGBM": {
+                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "num_leaves": optuna.distributions.IntUniformDistribution(20, 150),
+                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
+                "min_child_samples": optuna.distributions.IntUniformDistribution(10, 100),
+                "subsample": optuna.distributions.FloatDistribution(0.5, 1.0),
+                "colsample_bytree": optuna.distributions.FloatDistribution(0.5, 1.0),
+                "reg_alpha": optuna.distributions.FloatUniformDistribution(0.0, 5.0),
+                "reg_lambda": optuna.distributions.FloatUniformDistribution(0.0, 5.0),
+            },
+            "CatBoost": {
+                "iterations": optuna.distributions.IntUniformDistribution(100, 1000),
+                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
+                "depth": optuna.distributions.IntUniformDistribution(3, 16),
+                "l2_leaf_reg": optuna.distributions.IntUniformDistribution(1, 10),
+                "border_count": optuna.distributions.IntUniformDistribution(32, 256),
+                "bagging_temperature": optuna.distributions.FloatUniformDistribution(0.0, 5.0),
+            },
+            "Naive Bayes": {
+                "var_smoothing": optuna.distributions.LogUniformDistribution(1e-12, 1e-6),
+            },
+            "Voting Classifier": {
+                "voting": optuna.distributions.CategoricalDistribution(["soft", "hard"]),
+                "weights": optuna.distributions.CategoricalDistribution([
+                    [1, 1, 1],  # Equal weights for LogisticRegression, RandomForest, SVC
+                    [2, 1, 1],  # Favor LogisticRegression more
+                    [1, 2, 1],  # Favor RandomForest more
+                    [1, 1, 2],  # Favor SVC more
+                ]),
+            },
+            "Stacking Classifier": {  # Added parameter grid for StackingClassifier
+                "final_estimator__C": optuna.distributions.LogUniformDistribution(1e-4, 1e4),
+                "final_estimator__solver": optuna.distributions.CategoricalDistribution(["lbfgs", "liblinear"]),
+                "final_estimator__penalty": optuna.distributions.CategoricalDistribution(["l2"]),
             },
         }
 
@@ -426,6 +541,7 @@ class ClassificationSolver:
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[Dict[str, List[Any]]] = None,
+        param_distributions: Optional[Dict[str, Any]] = None,  # New argument for Bayesian
         cv: int = 5,
         search_type: str = "grid",
         n_iter: int = 50,
@@ -439,6 +555,7 @@ class ClassificationSolver:
             X_train (pd.DataFrame): Training features.
             y_train (pd.Series): Training target.
             param_grid (Optional[Dict[str, List[Any]]]): Parameter grid for hyperparameter tuning. If None, uses default.
+            param_distributions (Optional[Dict[str, Any]]): Parameter distributions for Bayesian optimization.
             cv (int): Number of cross-validation folds.
             search_type (str): Type of search ('grid', 'random', or 'bayesian').
             n_iter (int): Number of iterations for RandomizedSearchCV or Bayesian Optimization.
@@ -451,7 +568,7 @@ class ClassificationSolver:
             self.logger.info("Performing hyperparameter tuning for all models...")
             for name in self.models:
                 self._tune_single_model(
-                    name, X_train, y_train, param_grid, cv, search_type, n_iter, scoring
+                    name, X_train, y_train, param_grid, param_distributions, cv, search_type, n_iter, scoring
                 )
         else:
             self._tune_single_model(
@@ -459,6 +576,7 @@ class ClassificationSolver:
                 X_train,
                 y_train,
                 param_grid,
+                param_distributions,
                 cv,
                 search_type,
                 n_iter,
@@ -471,6 +589,7 @@ class ClassificationSolver:
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[Dict[str, List[Any]]],
+        param_distributions: Optional[Dict[str, Any]],
         cv: int,
         search_type: str,
         n_iter: int,
@@ -484,6 +603,7 @@ class ClassificationSolver:
             X_train (pd.DataFrame): Training features.
             y_train (pd.Series): Training target.
             param_grid (Optional[Dict[str, List[Any]]]): Parameter grid for hyperparameter tuning. If None, uses default.
+            param_distributions (Optional[Dict[str, Any]]): Parameter distributions for Bayesian optimization.
             cv (int): Number of cross-validation folds.
             search_type (str): Type of search ('grid', 'random', or 'bayesian').
             n_iter (int): Number of iterations for RandomizedSearchCV or Bayesian Optimization.
@@ -495,7 +615,8 @@ class ClassificationSolver:
         model = self.models[model_name]
         self.logger.info(f"Performing hyperparameter tuning for {model_name}...")
 
-        if param_grid is None:
+        # Use param_grid if provided, else use default
+        if param_grid is None and search_type != "bayesian":
             param_grid = self._default_param_grids().get(model_name, {})
             if not param_grid:
                 self.logger.warning(
@@ -513,6 +634,12 @@ class ClassificationSolver:
                 verbose=1,
             )
             search.fit(X_train, y_train.values.ravel())
+            self.logger.info(
+                f"Best parameters found for {model_name}: {search.best_params_}"
+            )
+            # Store the tuned model for future use
+            self.tuned_models[model_name] = search.best_estimator_
+
         elif search_type == "random":
             search = RandomizedSearchCV(
                 model,
@@ -525,31 +652,39 @@ class ClassificationSolver:
                 random_state=self.random_state,
             )
             search.fit(X_train, y_train.values.ravel())
+            self.logger.info(
+                f"Best parameters found for {model_name}: {search.best_params_}"
+            )
+            # Store the tuned model for future use
+            self.tuned_models[model_name] = search.best_estimator_
+
         elif search_type == "bayesian":  # Added Bayesian optimization
             self.logger.info(f"Using Bayesian Optimization for {model_name}...")
+            # Use param_distributions if provided, else use default Bayesian search spaces
+            if param_distributions is None:
+                param_distributions = self._default_bayesian_search_spaces().get(model_name, {})
+                if not param_distributions:
+                    self.logger.warning(
+                        f"No Bayesian parameter distribution available for {model_name}. Skipping tuning."
+                    )
+                    return
+
             study = optuna.create_study(direction="maximize")
-            func = self._create_objective(model, param_grid, X_train, y_train, cv, scoring)
-            study.optimize(func, n_trials=n_iter)
+            func = self._create_objective(model, param_distributions, X_train, y_train, cv, scoring)
+            study.optimize(func, n_trials=n_iter, show_progress_bar=True)
             best_params = study.best_params
             self.logger.info(f"Best parameters found for {model_name}: {best_params}")
             model.set_params(**best_params)
             model.fit(X_train, y_train)
             self.tuned_models[model_name] = model
-            return
+
         else:
             raise ValueError("search_type must be either 'grid', 'random', or 'bayesian'.")
-
-        self.logger.info(
-            f"Best parameters found for {model_name}: {search.best_params_}"
-        )
-
-        # Store the tuned model for future use
-        self.tuned_models[model_name] = search.best_estimator_
 
     def _create_objective(
         self,
         model: BaseEstimator,
-        param_grid: Dict[str, List[Any]],
+        param_distributions: Dict[str, Any],
         X: pd.DataFrame,
         y: pd.Series,
         cv: int,
@@ -560,7 +695,7 @@ class ClassificationSolver:
 
         Args:
             model (BaseEstimator): The machine learning model to be optimized.
-            param_grid (Dict[str, List[Any]]): The grid of hyperparameters to search over.
+            param_distributions (Dict[str, Any]): The distributions of hyperparameters to sample from.
             X (pd.DataFrame): Training data for features.
             y (pd.Series): Target labels for training data.
             cv (int): The number of cross-validation folds.
@@ -581,16 +716,18 @@ class ClassificationSolver:
                 float: The mean cross-validated score for the suggested hyperparameter set.
             """
             params = {}
-            for param, values in param_grid.items():
-                if isinstance(values, list):
-                    # Categorical or discrete parameters
-                    params[param] = trial.suggest_categorical(param, values)
-                elif isinstance(values, np.ndarray):
-                    # Continuous parameters
-                    params[param] = trial.suggest_float(param, float(values.min()), float(values.max()))
+            for param, distribution in param_distributions.items():
+                if isinstance(distribution, optuna.distributions.CategoricalDistribution):
+                    params[param] = trial.suggest_categorical(param, distribution.choices)
+                elif isinstance(distribution, optuna.distributions.LogUniformDistribution):
+                    params[param] = trial.suggest_loguniform(param, distribution.low, distribution.high)
+                elif isinstance(distribution, optuna.distributions.FloatUniformDistribution):
+                    params[param] = trial.suggest_float(param, distribution.low, distribution.high)
+                elif isinstance(distribution, optuna.distributions.IntUniformDistribution):
+                    params[param] = trial.suggest_int(param, distribution.low, distribution.high)
                 else:
-                    # Handle float or integer ranges
-                    params[param] = trial.suggest_float(param, float(min(values)), float(max(values)))
+                    # Handle other distribution types if necessary
+                    params[param] = trial.suggest_float(param, 0.0, 1.0)
 
             model.set_params(**params)
 
@@ -783,13 +920,17 @@ class ClassificationSolver:
         scores = {}
         for metric in scoring_metrics:
             self.logger.info(f"Calculating {metric}...")
-            score = cross_val_score(
-                model, X, y, cv=cv_strategy, scoring=metric, n_jobs=-1
-            )
-            scores[metric] = {
-                "mean": float(np.mean(score)),
-                "std": float(np.std(score)),
-            }
+            try:
+                score = cross_val_score(
+                    model, X, y, cv=cv_strategy, scoring=metric, n_jobs=-1
+                )
+                scores[metric] = {
+                    "mean": float(np.mean(score)),
+                    "std": float(np.std(score)),
+                }
+            except ValueError as e:
+                self.logger.warning(f"Skipping metric {metric} due to error: {e}")
+                continue
 
         # Return detailed cross-validation results
         return scores
@@ -871,6 +1012,7 @@ class ClassificationSolver:
             scoring=scoring,
             n_jobs=-1,
             train_sizes=np.linspace(0.1, 1.0, 5),
+            shuffle=True,
             random_state=self.random_state,
         )
         train_scores_mean = np.mean(train_scores, axis=1)
