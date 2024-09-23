@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "feat-engine"
-version = "1.0.1"
+version = "1.0.2"
 description = ""
 authors = ["Ryota Kobayashi <s.woods.m.29@gmail.com>"]
 readme = "README.md"
