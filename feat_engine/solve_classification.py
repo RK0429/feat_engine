@@ -143,7 +143,7 @@ class ClassificationSolver:
             "Logistic Regression": {
                 "C": [0.001, 0.01, 0.1, 1, 10, 100],
                 "solver": ["liblinear", "lbfgs", "saga", "newton-cg"],
-                "penalty": ["l1", "l2", "elasticnet", "none"],
+                "penalty": ["l1", "l2", "elasticnet", None],
                 "l1_ratio": [0.0, 0.5, 1.0],  # Only used if penalty='elasticnet'
             },
             "Random Forest": {
@@ -239,7 +239,7 @@ class ClassificationSolver:
             "Logistic Regression": {
                 "C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, log=True),  # Updated
                 "solver": optuna.distributions.CategoricalDistribution(choices=["liblinear", "lbfgs", "saga", "newton-cg"]),
-                "penalty": optuna.distributions.CategoricalDistribution(choices=["l1", "l2", "elasticnet", "none"]),
+                "penalty": optuna.distributions.CategoricalDistribution(choices=["l1", "l2", "elasticnet", None]),
                 "l1_ratio": optuna.distributions.FloatDistribution(low=0.0, high=1.0, log=False),  # Updated
             },
             "Random Forest": {
