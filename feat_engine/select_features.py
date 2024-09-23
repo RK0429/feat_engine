@@ -12,12 +12,19 @@ from sklearn.feature_selection import (
     VarianceThreshold,
     SelectFromModel,
 )
-from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import (
+    GradientBoostingClassifier,
+    GradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor
+)
 from sklearn.linear_model import LogisticRegression, Lasso
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from typing import Optional, Union, List, Any, Dict
 from sklearn.exceptions import NotFittedError
+from skopt import BayesSearchCV
+from skopt.space import Real, Integer, Categorical
 
 
 class FeatureSelector(BaseEstimator, TransformerMixin):
@@ -212,7 +219,7 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
 
 class AutoFeatureSelector(BaseEstimator, TransformerMixin):
     """
-    A transformer that automatically selects the best feature selection method and optimizes its parameters.
+    A transformer that automatically selects the best feature selection method and optimizes its parameters using Grid Search, Random Search, or Bayesian Optimization.
     """
 
     def __init__(
@@ -224,20 +231,20 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         n_iter: int = 50,
         scoring: Optional[str] = None,
         random_state: int = 42,
-        search_type: str = 'grid',  # 'grid' or 'random'
+        search_type: str = 'grid',  # 'grid', 'random', or 'bayesian'
     ) -> None:
         """
-        Initializes the AutomatedFeatureSelector with specified parameters.
+        Initializes the AutoFeatureSelector with specified parameters.
 
         Args:
             problem_type (str): 'classification' or 'regression'. Default is 'classification'.
             model (Any, optional): The machine learning model to use. If None, defaults to RandomForestClassifier or RandomForestRegressor based on problem_type.
             param_distributions (Dict[str, Any], optional): Parameter grid or distributions for hyperparameter optimization.
             cv (int): Number of cross-validation folds. Default is 5.
-            n_iter (int): Number of iterations for RandomizedSearchCV. Ignored if search_type is 'grid'.
+            n_iter (int): Number of iterations for RandomizedSearchCV or BayesSearchCV.
             scoring (str, optional): Scoring metric for optimization. Default is None.
             random_state (int): Random seed for reproducibility. Default is 42.
-            search_type (str): Type of hyperparameter search ('grid' or 'random'). Default is 'grid'.
+            search_type (str): Type of hyperparameter search ('grid', 'random', or 'bayesian'). Default is 'grid'.
         """
         self.problem_type = problem_type
         self.model = model
@@ -246,7 +253,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         self.n_iter = n_iter
         self.scoring = scoring
         self.random_state = random_state
-        self.search_type = search_type
+        self.search_type = search_type.lower()
 
         self.best_estimator_ = None
         self.best_params_ = None
@@ -261,17 +268,10 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             y (pd.Series, optional): The target variable. Required for supervised feature selection methods.
 
         Returns:
-            AutomatedFeatureSelector: Returns self.
+            AutoFeatureSelector: Returns self.
         """
         if self.problem_type not in ['classification', 'regression']:
             raise ValueError("problem_type must be 'classification' or 'regression'.")
-
-        # Define default machine learning model if not provided
-        if self.model is None:
-            if self.problem_type == 'classification':
-                self.model = RandomForestClassifier(random_state=self.random_state)
-            else:
-                self.model = RandomForestRegressor(random_state=self.random_state)
 
         # Define the pipeline
         pipe = Pipeline([
@@ -279,8 +279,13 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             ('model', self.model)
         ])
 
-        # Define parameter grid including different feature selection methods and their parameters
-        param_grid = self._get_param_grid(X)
+        # Define parameter search space based on search_type
+        if self.search_type in ['grid', 'random']:
+            param_grid = self._get_grid_param_grid(X)
+        elif self.search_type == 'bayesian':
+            param_grid = self._get_bayes_param_search_space(X)
+        else:
+            raise ValueError("search_type must be 'grid', 'random', or 'bayesian'.")
 
         # Choose the search method
         if self.search_type == 'grid':
@@ -303,8 +308,24 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 verbose=1,
                 random_state=self.random_state,
             )
+        elif self.search_type == 'bayesian':
+            # Initialize BayesSearchCV
+            search = BayesSearchCV(
+                estimator=pipe,
+                search_spaces=param_grid,
+                scoring=self.scoring,
+                cv=self.cv,
+                n_iter=self.n_iter,
+                n_jobs=-1,
+                verbose=1,
+                random_state=self.random_state,
+                # Optional: define the acquisition function, initial points, etc.
+                # For example:
+                # optimizer_kwargs={'acq_func': 'EI'},  # Expected Improvement
+            )
         else:
-            raise ValueError("search_type must be 'grid' or 'random'.")
+            # This case is already handled above, but added for completeness
+            raise ValueError("search_type must be 'grid', 'random', or 'bayesian'.")
 
         # Fit the search object
         search.fit(X, y)
@@ -365,7 +386,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             Union[np.ndarray, List[int]]: The mask of selected features, or array of indices.
         """
         if self.best_estimator_ is None:
-            raise NotFittedError("This AutomatedFeatureSelector instance is not fitted yet.")
+            raise NotFittedError("This AutoFeatureSelector instance is not fitted yet.")
         support = self.best_estimator_.named_steps['selector'].get_support(indices)
         return support
 
@@ -380,28 +401,30 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             List[str]: The list of selected feature names.
         """
         if self.best_estimator_ is None:
-            raise NotFittedError("This AutomatedFeatureSelector instance is not fitted yet.")
+            raise NotFittedError("This AutoFeatureSelector instance is not fitted yet.")
         if input_features is None:
             raise ValueError("input_features must be provided.")
         support = self.get_support(indices=True)
         return [input_features[i] for i in support]
 
-    def _get_param_grid(self, X: pd.DataFrame) -> List[Dict[str, Any]] | Dict[str, Any]:
+    def _get_grid_param_grid(self, X: pd.DataFrame) -> List[Dict[str, Any]] | Dict[str, Any]:
         """
-        Generates the parameter grid for hyperparameter optimization based on the number of features in X.
+        Generates the parameter grid for GridSearchCV and RandomizedSearchCV based on the number of features in X.
 
         Args:
             X (pd.DataFrame): The input data to determine the number of features.
 
         Returns:
-            Dict[str, Any]: The parameter grid.
+            List[Dict[str, Any]] | Dict[str, Any]: The parameter grid.
         """
         # Create the dynamic range for 'k' using np.linspace
         num_columns = len(X.columns)
-        step = num_columns // 5
-        k_values = np.arange(5, num_columns, step, dtype=int)
+        step = max(1, num_columns // 5)  # Ensure step is at least 1
+        k_max = num_columns
+        k_min = 5  # Define a minimum number of features to select
+        k_values = list(range(k_min, k_max, step))
 
-        # Define default parameter grid for classification and regression problems
+        # Define parameter grid for grid/random search
         if self.problem_type == 'classification':
             param_grid = [
                 # SelectKBest with chi2
@@ -425,7 +448,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # VarianceThreshold
                 {
                     'selector': [VarianceThreshold()],
-                    'selector__threshold': [0, 0.01, 0.1],
+                    'selector__threshold': [0.0, 0.01, 0.1],
                 },
                 # Recursive Feature Elimination (RFE) with LogisticRegression
                 {
@@ -445,17 +468,17 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # SelectFromModel with LogisticRegression
                 {
                     'selector': [SelectFromModel(LogisticRegression(solver='liblinear'))],
-                    'selector__threshold': ['mean', 'median', -np.inf],
+                    'selector__threshold': ['mean', 'median', '0.0'],
                 },
                 # SelectFromModel with RandomForestClassifier
                 {
                     'selector': [SelectFromModel(RandomForestClassifier(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', -np.inf],
+                    'selector__threshold': ['mean', 'median', '0.0'],
                 },
                 # SelectFromModel with GradientBoostingClassifier
                 {
                     'selector': [SelectFromModel(estimator=GradientBoostingClassifier(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', -np.inf],
+                    'selector__threshold': ['mean', 'median', '0.0'],
                 },
             ]
         else:
@@ -476,7 +499,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # VarianceThreshold
                 {
                     'selector': [VarianceThreshold()],
-                    'selector__threshold': [0, 0.01, 0.1],
+                    'selector__threshold': [0.0, 0.01, 0.1],
                 },
                 # Recursive Feature Elimination (RFE) with Lasso
                 {
@@ -491,18 +514,139 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # SelectFromModel with Lasso
                 {
                     'selector': [SelectFromModel(Lasso(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', -np.inf],
+                    'selector__threshold': ['mean', 'median', '0.0'],
                 },
                 # SelectFromModel with RandomForestRegressor
                 {
                     'selector': [SelectFromModel(RandomForestRegressor(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', -np.inf],
+                    'selector__threshold': ['mean', 'median', '0.0'],
                 },
                 # SelectFromModel with GradientBoostingRegressor
                 {
                     'selector': [SelectFromModel(estimator=GradientBoostingRegressor(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', -np.inf],
+                    'selector__threshold': ['mean', 'median', '0.0'],
                 },
             ]
 
         return param_grid
+
+    def _get_bayes_param_search_space(self, X: pd.DataFrame) -> List[Dict[str, Any]] | Dict[str, Any]:
+        """
+        Generates the parameter search space for Bayesian optimization based on the number of features in X.
+
+        Args:
+            X (pd.DataFrame): The input data to determine the number of features.
+
+        Returns:
+            List[Dict[str, Any]] | Dict[str, Any]: The parameter search space.
+        """
+        # Create the dynamic range for 'k' using np.linspace
+        num_columns = len(X.columns)
+        k_max = num_columns
+        k_min = 5  # Define a minimum number of features to select
+
+        # Define parameter distributions for Bayesian optimization
+        if self.problem_type == 'classification':
+            param_search_space = [
+                # SelectKBest with chi2
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [chi2],
+                    'selector__k': Integer(k_min, k_max),
+                },
+                # SelectKBest with f_classif
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [f_classif],
+                    'selector__k': Integer(k_min, k_max),
+                },
+                # SelectKBest with mutual_info_classif
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [mutual_info_classif],
+                    'selector__k': Integer(k_min, k_max),
+                },
+                # VarianceThreshold
+                {
+                    'selector': [VarianceThreshold()],
+                    'selector__threshold': Real(0.0, 0.5, prior='uniform'),
+                },
+                # Recursive Feature Elimination (RFE) with LogisticRegression
+                {
+                    'selector': [RFE(estimator=LogisticRegression(solver='liblinear'))],
+                    'selector__n_features_to_select': Integer(k_min, k_max),
+                },
+                # Recursive Feature Elimination (RFE) with LogisticRegression (L1 normalization)
+                {
+                    'selector': [RFE(estimator=LogisticRegression(penalty='l1', solver='liblinear'))],
+                    'selector__n_features_to_select': Integer(k_min, k_max),
+                },
+                # Recursive Feature Elimination (RFE) with RandomForestClassifier
+                {
+                    'selector': [RFE(estimator=RandomForestClassifier(random_state=self.random_state))],
+                    'selector__n_features_to_select': Integer(k_min, k_max),
+                },
+                # SelectFromModel with LogisticRegression
+                {
+                    'selector': [SelectFromModel(LogisticRegression(solver='liblinear'))],
+                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                },
+                # SelectFromModel with RandomForestClassifier
+                {
+                    'selector': [SelectFromModel(RandomForestClassifier(random_state=self.random_state))],
+                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                },
+                # SelectFromModel with GradientBoostingClassifier
+                {
+                    'selector': [SelectFromModel(estimator=GradientBoostingClassifier(random_state=self.random_state))],
+                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                },
+            ]
+        else:
+            # Regression
+            param_search_space = [
+                # SelectKBest with f_regression
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [f_regression],
+                    'selector__k': Integer(k_min, k_max),
+                },
+                # SelectKBest with mutual_info_regression
+                {
+                    'selector': [SelectKBest()],
+                    'selector__score_func': [mutual_info_regression],
+                    'selector__k': Integer(k_min, k_max),
+                },
+                # VarianceThreshold
+                {
+                    'selector': [VarianceThreshold()],
+                    'selector__threshold': Real(0.0, 0.5, prior='uniform'),
+                },
+                # Recursive Feature Elimination (RFE) with Lasso
+                {
+                    'selector': [RFE(estimator=Lasso(random_state=self.random_state))],
+                    'selector__n_features_to_select': Integer(k_min, k_max),
+                },
+                # Recursive Feature Elimination (RFE) with RandomForestRegressor
+                {
+                    'selector': [RFE(estimator=RandomForestRegressor(random_state=self.random_state))],
+                    'selector__n_features_to_select': Integer(k_min, k_max),
+                },
+                # SelectFromModel with Lasso
+                {
+                    'selector': [SelectFromModel(Lasso(random_state=self.random_state))],
+                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                },
+                # SelectFromModel with RandomForestRegressor
+                {
+                    'selector': [SelectFromModel(RandomForestRegressor(random_state=self.random_state))],
+                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                },
+                # SelectFromModel with GradientBoostingRegressor
+                {
+                    'selector': [SelectFromModel(estimator=GradientBoostingRegressor(random_state=self.random_state))],
+                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                },
+            ]
+
+        return param_search_space
