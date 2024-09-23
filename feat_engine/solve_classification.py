@@ -668,9 +668,9 @@ class ClassificationSolver:
                     )
                     return
 
-            optuna.logging.disable_default_handler()
             study = optuna.create_study(direction="maximize" if 'accuracy' in scoring else "minimize")
             func = self._create_objective(model, param_distributions, X_train, y_train, cv, scoring)
+            optuna.logging.disable_default_handler()
             study.optimize(func, n_trials=n_iter, show_progress_bar=True)
             best_params = study.best_params
             self.logger.info(f"Best parameters found for {model_name}: {best_params}")
