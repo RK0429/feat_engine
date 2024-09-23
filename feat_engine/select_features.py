@@ -475,17 +475,17 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # SelectFromModel with LogisticRegression
                 {
                     'selector': [SelectFromModel(LogisticRegression(solver='liblinear'))],
-                    'selector__threshold': ['mean', 'median', '0.0'],
+                    'selector__threshold': ['mean', 'median', 0.0],
                 },
                 # SelectFromModel with RandomForestClassifier
                 {
                     'selector': [SelectFromModel(RandomForestClassifier(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', '0.0'],
+                    'selector__threshold': ['mean', 'median', 0.0],
                 },
                 # SelectFromModel with GradientBoostingClassifier
                 {
                     'selector': [SelectFromModel(estimator=GradientBoostingClassifier(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', '0.0'],
+                    'selector__threshold': ['mean', 'median', 0.0],
                 },
             ]
         else:
@@ -521,17 +521,17 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # SelectFromModel with Lasso
                 {
                     'selector': [SelectFromModel(Lasso(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', '0.0'],
+                    'selector__threshold': ['mean', 'median', 0.0],
                 },
                 # SelectFromModel with RandomForestRegressor
                 {
                     'selector': [SelectFromModel(RandomForestRegressor(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', '0.0'],
+                    'selector__threshold': ['mean', 'median', 0.0],
                 },
                 # SelectFromModel with GradientBoostingRegressor
                 {
                     'selector': [SelectFromModel(estimator=GradientBoostingRegressor(random_state=self.random_state))],
-                    'selector__threshold': ['mean', 'median', '0.0'],
+                    'selector__threshold': ['mean', 'median', 0.0],
                 },
             ]
 
@@ -596,17 +596,17 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # SelectFromModel with LogisticRegression
                 {
                     'selector': [SelectFromModel(LogisticRegression(solver='liblinear'))],
-                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                    'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
                 # SelectFromModel with RandomForestClassifier
                 {
                     'selector': [SelectFromModel(RandomForestClassifier(random_state=self.random_state))],
-                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                    'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
                 # SelectFromModel with GradientBoostingClassifier
                 {
                     'selector': [SelectFromModel(estimator=GradientBoostingClassifier(random_state=self.random_state))],
-                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                    'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
             ]
         else:
@@ -642,17 +642,17 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # SelectFromModel with Lasso
                 {
                     'selector': [SelectFromModel(Lasso(random_state=self.random_state))],
-                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                    'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
                 # SelectFromModel with RandomForestRegressor
                 {
                     'selector': [SelectFromModel(RandomForestRegressor(random_state=self.random_state))],
-                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                    'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
                 # SelectFromModel with GradientBoostingRegressor
                 {
                     'selector': [SelectFromModel(estimator=GradientBoostingRegressor(random_state=self.random_state))],
-                    'selector__threshold': Categorical(['mean', 'median', '0.0']),
+                    'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
             ]
 
