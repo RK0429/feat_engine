@@ -237,75 +237,75 @@ class ClassificationSolver:
         """
         return {
             "Logistic Regression": {
-                "C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, distribution='log'),  # Updated
+                "C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, log=True),  # Updated
                 "solver": optuna.distributions.CategoricalDistribution(choices=["liblinear", "lbfgs", "saga", "newton-cg"]),
                 "penalty": optuna.distributions.CategoricalDistribution(choices=["l1", "l2", "elasticnet", "none"]),
-                "l1_ratio": optuna.distributions.FloatDistribution(low=0.0, high=1.0, distribution='uniform'),  # Updated
+                "l1_ratio": optuna.distributions.FloatDistribution(low=0.0, high=1.0, log=False),  # Updated
             },
             "Random Forest": {
-                "n_estimators": optuna.distributions.IntDistribution(low=10, high=1000, distribution='uniform'),  # Updated
-                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, distribution='uniform'),  # Updated
-                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, distribution='uniform'),  # Updated
-                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, distribution='uniform'),  # Updated
+                "n_estimators": optuna.distributions.IntDistribution(low=10, high=1000, log=False),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, log=False),  # Updated
+                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, log=False),  # Updated
+                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, log=False),  # Updated
                 "max_features": optuna.distributions.CategoricalDistribution(choices=["auto", "sqrt", "log2"]),
             },
             "Gradient Boosting": {
-                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
-                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
-                "max_depth": optuna.distributions.IntDistribution(low=3, high=20, distribution='uniform'),  # Updated
-                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
-                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, distribution='uniform'),  # Updated
-                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, distribution='uniform'),  # Updated
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, log=False),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, log=True),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=3, high=20, log=False),  # Updated
+                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, log=False),  # Updated
+                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, log=False),  # Updated
+                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, log=False),  # Updated
             },
             "Support Vector Machine": {
-                "C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, distribution='log'),  # Updated
+                "C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, log=True),  # Updated
                 "kernel": optuna.distributions.CategoricalDistribution(choices=["linear", "rbf", "poly", "sigmoid"]),
                 "gamma": optuna.distributions.CategoricalDistribution(choices=["scale", "auto"]),
             },
             "K-Nearest Neighbors": {
-                "n_neighbors": optuna.distributions.IntDistribution(low=1, high=30, distribution='uniform'),  # Updated
+                "n_neighbors": optuna.distributions.IntDistribution(low=1, high=30, log=False),  # Updated
                 "weights": optuna.distributions.CategoricalDistribution(choices=["uniform", "distance"]),
-                "p": optuna.distributions.IntDistribution(low=1, high=2, distribution='uniform'),  # Updated
+                "p": optuna.distributions.IntDistribution(low=1, high=2, log=False),  # Updated
                 "metric": optuna.distributions.CategoricalDistribution(choices=["minkowski", "euclidean", "manhattan"]),
             },
             "Decision Tree": {
-                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, distribution='uniform'),  # Updated
-                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, distribution='uniform'),  # Updated
-                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, distribution='uniform'),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, log=False),  # Updated
+                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, log=False),  # Updated
+                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, log=False),  # Updated
                 "criterion": optuna.distributions.CategoricalDistribution(choices=["gini", "entropy"]),
                 "max_features": optuna.distributions.CategoricalDistribution(choices=["auto", "sqrt", "log2"]),
             },
             "XGBoost": {
-                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
-                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
-                "max_depth": optuna.distributions.IntDistribution(low=1, high=20, distribution='uniform'),  # Updated
-                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
-                "colsample_bytree": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
-                "gamma": optuna.distributions.FloatDistribution(low=0.0, high=5.0, distribution='uniform'),  # Updated
-                "reg_alpha": optuna.distributions.FloatDistribution(low=0.0, high=5.0, distribution='uniform'),  # Updated
-                "reg_lambda": optuna.distributions.FloatDistribution(low=1.0, high=5.0, distribution='uniform'),  # Updated
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, log=False),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, log=True),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=1, high=20, log=False),  # Updated
+                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, log=False),  # Updated
+                "colsample_bytree": optuna.distributions.FloatDistribution(low=0.5, high=1.0, log=False),  # Updated
+                "gamma": optuna.distributions.FloatDistribution(low=0.0, high=5.0, log=False),  # Updated
+                "reg_alpha": optuna.distributions.FloatDistribution(low=0.0, high=5.0, log=False),  # Updated
+                "reg_lambda": optuna.distributions.FloatDistribution(low=1.0, high=5.0, log=False),  # Updated
             },
             "LightGBM": {
-                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
-                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
-                "num_leaves": optuna.distributions.IntDistribution(low=20, high=150, distribution='uniform'),  # Updated
-                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, distribution='uniform'),  # Updated
-                "min_child_samples": optuna.distributions.IntDistribution(low=10, high=100, distribution='uniform'),  # Updated
-                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
-                "colsample_bytree": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
-                "reg_alpha": optuna.distributions.FloatDistribution(low=0.0, high=5.0, distribution='uniform'),  # Updated
-                "reg_lambda": optuna.distributions.FloatDistribution(low=0.0, high=5.0, distribution='uniform'),  # Updated
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, log=False),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, log=True),  # Updated
+                "num_leaves": optuna.distributions.IntDistribution(low=20, high=150, log=False),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, log=False),  # Updated
+                "min_child_samples": optuna.distributions.IntDistribution(low=10, high=100, log=False),  # Updated
+                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, log=False),  # Updated
+                "colsample_bytree": optuna.distributions.FloatDistribution(low=0.5, high=1.0, log=False),  # Updated
+                "reg_alpha": optuna.distributions.FloatDistribution(low=0.0, high=5.0, log=False),  # Updated
+                "reg_lambda": optuna.distributions.FloatDistribution(low=0.0, high=5.0, log=False),  # Updated
             },
             "CatBoost": {
-                "iterations": optuna.distributions.IntDistribution(low=100, high=1000, distribution='uniform'),  # Updated
-                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
-                "depth": optuna.distributions.IntDistribution(low=3, high=16, distribution='uniform'),  # Updated
-                "l2_leaf_reg": optuna.distributions.IntDistribution(low=1, high=10, distribution='uniform'),  # Updated
-                "border_count": optuna.distributions.IntDistribution(low=32, high=256, distribution='uniform'),  # Updated
-                "bagging_temperature": optuna.distributions.FloatDistribution(low=0.0, high=5.0, distribution='uniform'),  # Updated
+                "iterations": optuna.distributions.IntDistribution(low=100, high=1000, log=False),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, log=True),  # Updated
+                "depth": optuna.distributions.IntDistribution(low=3, high=16, log=False),  # Updated
+                "l2_leaf_reg": optuna.distributions.IntDistribution(low=1, high=10, log=False),  # Updated
+                "border_count": optuna.distributions.IntDistribution(low=32, high=256, log=False),  # Updated
+                "bagging_temperature": optuna.distributions.FloatDistribution(low=0.0, high=5.0, log=False),  # Updated
             },
             "Naive Bayes": {
-                "var_smoothing": optuna.distributions.FloatDistribution(low=1e-12, high=1e-6, distribution='log'),  # Updated
+                "var_smoothing": optuna.distributions.FloatDistribution(low=1e-12, high=1e-6, log=True),  # Updated
             },
             "Voting Classifier": {
                 "voting": optuna.distributions.CategoricalDistribution(choices=["soft", "hard"]),
@@ -317,7 +317,7 @@ class ClassificationSolver:
                 ]),
             },
             "Stacking Classifier": {  # Added parameter grid for StackingClassifier
-                "final_estimator__C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, distribution='log'),  # Updated
+                "final_estimator__C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, log=True),  # Updated
                 "final_estimator__solver": optuna.distributions.CategoricalDistribution(choices=["lbfgs", "liblinear"]),
                 "final_estimator__penalty": optuna.distributions.CategoricalDistribution(choices=["l2"]),
             },
