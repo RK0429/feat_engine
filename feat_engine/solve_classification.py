@@ -310,10 +310,10 @@ class ClassificationSolver:
             "Voting Classifier": {
                 "voting": optuna.distributions.CategoricalDistribution(choices=["soft", "hard"]),
                 "weights": optuna.distributions.CategoricalDistribution(choices=[
-                    [1, 1, 1],  # Equal weights for LogisticRegression, RandomForest, SVC
-                    [2, 1, 1],  # Favor LogisticRegression more
-                    [1, 2, 1],  # Favor RandomForest more
-                    [1, 1, 2],  # Favor SVC more
+                    (1, 1, 1),  # Equal weights for LogisticRegression, RandomForest, SVC
+                    (2, 1, 1),  # Favor LogisticRegression more
+                    (1, 2, 1),  # Favor RandomForest more
+                    (1, 1, 2),  # Favor SVC more
                 ]),
             },
             "Stacking Classifier": {  # Added parameter grid for StackingClassifier
