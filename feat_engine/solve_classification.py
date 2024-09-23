@@ -719,10 +719,7 @@ class ClassificationSolver:
                 if isinstance(distribution, optuna.distributions.CategoricalDistribution):
                     params[param] = trial.suggest_categorical(param, distribution.choices)
                 elif isinstance(distribution, optuna.distributions.FloatDistribution):
-                    if distribution.log:
-                        params[param] = trial.suggest_loguniform(param, distribution.low, distribution.high)
-                    else:
-                        params[param] = trial.suggest_uniform(param, distribution.low, distribution.high)
+                    params[param] = trial.suggest_float(param, distribution.low, distribution.high, distribution.log)
                 elif isinstance(distribution, optuna.distributions.IntDistribution):
                     params[param] = trial.suggest_int(param, distribution.low, distribution.high)
                 else:
