@@ -753,22 +753,25 @@ class ClassificationSolver:
         plt.show()
 
     def cross_validate_model(
-        self, model_name: str, X: pd.DataFrame, y: pd.Series, cv: int = 5
+        self,
+        model: BaseEstimator,
+        X: pd.DataFrame,
+        y: pd.Series,
+        cv: int = 5
     ) -> Dict[str, Any]:
         """
         Cross-validates the model using the specified number of folds and returns detailed metrics.
 
         Args:
-            model_name (str): The name of the model to cross-validate.
+            model (BaseEstimator): The model to cross-validate.
             X (pd.DataFrame): Feature matrix.
             y (pd.Series): Target variable.
-            cv (int): Number of cross-validation folds.
+            cv (int): Number of cross-validation folds (default: 5).
 
         Returns:
             Dict[str, Any]: Cross-validation metrics including accuracy, precision, recall, f1, ROC AUC, etc.
         """
-        model = self.models[model_name]
-        self.logger.info(f"Cross-validating model: {model_name}")
+        self.logger.info("Cross-validating the provided model...")
 
         # Define stratified cross-validation
         cv_strategy = StratifiedKFold(n_splits=cv, shuffle=True, random_state=self.random_state)
