@@ -273,6 +273,13 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         if self.problem_type not in ['classification', 'regression']:
             raise ValueError("problem_type must be 'classification' or 'regression'.")
 
+        # Define default machine learning model if not provided
+        if self.model is None:
+            if self.problem_type == 'classification':
+                self.model = RandomForestClassifier(random_state=self.random_state)
+            else:
+                self.model = RandomForestRegressor(random_state=self.random_state)
+
         # Define the pipeline
         pipe = Pipeline([
             ('selector', 'passthrough'),  # Placeholder for feature selector
