@@ -239,7 +239,7 @@ class ClassificationSolver:
             "Logistic Regression": {
                 "C": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, log=True),  # Updated
                 "solver": optuna.distributions.CategoricalDistribution(choices=["liblinear", "lbfgs", "saga", "newton-cg"]),
-                "penalty": optuna.distributions.CategoricalDistribution(choices=["l1", "l2", None]),
+                "penalty": optuna.distributions.CategoricalDistribution(choices=["l2", None]),
                 "l1_ratio": optuna.distributions.FloatDistribution(low=0.0, high=1.0, log=False),  # Updated
             },
             "Random Forest": {
