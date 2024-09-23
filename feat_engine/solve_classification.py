@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import optuna  # Added for Bayesian optimization
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
 
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
@@ -15,6 +16,7 @@ from sklearn.ensemble import (
     RandomForestClassifier,
     GradientBoostingClassifier,
     VotingClassifier,
+    StackingClassifier,  # Added for stacking
 )
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -90,7 +92,7 @@ class ClassificationSolver:
             ),
             "K-Nearest Neighbors": KNeighborsClassifier(),
             "Decision Tree": DecisionTreeClassifier(random_state=self.random_state),
-            "XGBoost": XGBClassifier(eval_metric="logloss"),
+            "XGBoost": XGBClassifier(eval_metric="logloss", use_label_encoder=False, random_state=self.random_state),
             "LightGBM": LGBMClassifier(random_state=self.random_state),
             "CatBoost": CatBoostClassifier(
                 verbose=0, random_state=self.random_state
@@ -116,6 +118,15 @@ class ClassificationSolver:
                     ),
                 ],
                 voting="soft",
+            ),
+            "Stacking Classifier": StackingClassifier(  # Added StackingClassifier
+                estimators=[
+                    ("rf", RandomForestClassifier(random_state=self.random_state)),
+                    ("svc", SVC(probability=True, random_state=self.random_state)),
+                ],
+                final_estimator=LogisticRegression(random_state=self.random_state),
+                passthrough=True,
+                cv=5,
             ),
         }
 
@@ -188,6 +199,10 @@ class ClassificationSolver:
                     [1, 2, 1],  # Favor RandomForest more
                     [1, 1, 2],  # Favor SVC more
                 ],
+            },
+            "Stacking Classifier": {  # Added parameter grid for StackingClassifier
+                "final_estimator__C": [0.01, 0.1, 1, 10],
+                "final_estimator__solver": ["lbfgs", "liblinear"],
             },
         }
 
@@ -415,7 +430,7 @@ class ClassificationSolver:
         scoring: str = "accuracy",
     ) -> None:
         """
-        Performs hyperparameter tuning using GridSearchCV or RandomizedSearchCV for one or all models and stores the best models.
+        Performs hyperparameter tuning using GridSearchCV, RandomizedSearchCV, or Bayesian Optimization for one or all models and stores the best models.
 
         Args:
             model_name (str): The name of the model to tune. If 'all', tunes all models in self.models.
@@ -423,8 +438,8 @@ class ClassificationSolver:
             y_train (pd.Series): Training target.
             param_grid (Optional[Dict[str, List[Any]]]): Parameter grid for hyperparameter tuning. If None, uses default.
             cv (int): Number of cross-validation folds.
-            search_type (str): Type of search ('grid' or 'random').
-            n_iter (int): Number of iterations for RandomizedSearchCV.
+            search_type (str): Type of search ('grid', 'random', or 'bayesian').
+            n_iter (int): Number of iterations for RandomizedSearchCV or Bayesian Optimization.
             scoring (str): Scoring metric for evaluation.
 
         Returns:
@@ -468,8 +483,8 @@ class ClassificationSolver:
             y_train (pd.Series): Training target.
             param_grid (Optional[Dict[str, List[Any]]]): Parameter grid for hyperparameter tuning. If None, uses default.
             cv (int): Number of cross-validation folds.
-            search_type (str): Type of search ('grid' or 'random').
-            n_iter (int): Number of iterations for RandomizedSearchCV.
+            search_type (str): Type of search ('grid', 'random', or 'bayesian').
+            n_iter (int): Number of iterations for RandomizedSearchCV or Bayesian Optimization.
             scoring (str): Scoring metric for evaluation.
 
         Returns:
@@ -495,6 +510,7 @@ class ClassificationSolver:
                 n_jobs=-1,
                 verbose=1,
             )
+            search.fit(X_train, y_train.values.ravel())
         elif search_type == "random":
             search = RandomizedSearchCV(
                 model,
@@ -506,16 +522,83 @@ class ClassificationSolver:
                 verbose=1,
                 random_state=self.random_state,
             )
+            search.fit(X_train, y_train.values.ravel())
+        elif search_type == "bayesian":  # Added Bayesian optimization
+            self.logger.info(f"Using Bayesian Optimization for {model_name}...")
+            study = optuna.create_study(direction="maximize")
+            func = self._create_objective(model, param_grid, X_train, y_train, cv, scoring)
+            study.optimize(func, n_trials=n_iter)
+            best_params = study.best_params
+            self.logger.info(f"Best parameters found for {model_name}: {best_params}")
+            model.set_params(**best_params)
+            model.fit(X_train, y_train)
+            self.tuned_models[model_name] = model
+            return
         else:
-            raise ValueError("search_type must be either 'grid' or 'random'.")
+            raise ValueError("search_type must be either 'grid', 'random', or 'bayesian'.")
 
-        search.fit(X_train, y_train.values.ravel())
         self.logger.info(
             f"Best parameters found for {model_name}: {search.best_params_}"
         )
 
         # Store the tuned model for future use
         self.tuned_models[model_name] = search.best_estimator_
+
+    def _create_objective(
+        self,
+        model: BaseEstimator,
+        param_grid: Dict[str, List[Any]],
+        X: pd.DataFrame,
+        y: pd.Series,
+        cv: int,
+        scoring: str,
+    ) -> Callable[[Any], Any]:
+        """
+        Creates an objective function for Optuna to optimize model hyperparameters.
+
+        Args:
+            model (BaseEstimator): The machine learning model to be optimized.
+            param_grid (Dict[str, List[Any]]): The grid of hyperparameters to search over.
+            X (pd.DataFrame): Training data for features.
+            y (pd.Series): Target labels for training data.
+            cv (int): The number of cross-validation folds.
+            scoring (str): The scoring metric to evaluate model performance.
+
+        Returns:
+            Callable[[Any], float]: The objective function to be minimized or maximized by Optuna.
+        """
+
+        def objective(trial: Any) -> Any:
+            """
+            The actual objective function used by Optuna to evaluate a set of hyperparameters.
+
+            Args:
+                trial (Any): A single trial instance that suggests hyperparameters.
+
+            Returns:
+                float: The mean cross-validated score for the suggested hyperparameter set.
+            """
+            params = {}
+            for param, values in param_grid.items():
+                if isinstance(values, list):
+                    # Categorical or discrete parameters
+                    params[param] = trial.suggest_categorical(param, values)
+                elif isinstance(values, np.ndarray):
+                    # Continuous parameters
+                    params[param] = trial.suggest_float(param, float(values.min()), float(values.max()))
+                else:
+                    # Handle float or integer ranges
+                    params[param] = trial.suggest_float(param, float(min(values)), float(max(values)))
+
+            model.set_params(**params)
+
+            # Use stratified k-fold cross-validation to evaluate the model
+            cv_strategy = StratifiedKFold(n_splits=cv, shuffle=True, random_state=self.random_state)
+            score = cross_val_score(model, X, y, cv=cv_strategy, scoring=scoring, n_jobs=-1).mean()
+
+            return score
+
+        return objective
 
     def auto_select_best_model(
         self, X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5
@@ -834,3 +917,61 @@ class ClassificationSolver:
         model = joblib.load(filename)
         self.logger.info(f"Model loaded from {filename}")
         return model
+
+    def model_merging(
+        self,
+        base_models: List[str],
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        final_estimator: Optional[BaseEstimator] = None,
+        passthrough: bool = False,
+        cv: int = 5,
+    ) -> StackingClassifier:
+        """
+        Creates a Stacking Classifier by merging multiple base models with a final estimator.
+
+        Args:
+            base_models (List[str]): List of model names to be used as base models.
+            X_train (pd.DataFrame): Training features.
+            y_train (pd.Series): Training target.
+            final_estimator (Optional[BaseEstimator]): The final estimator to combine base models. Defaults to LogisticRegression.
+            passthrough (bool): If True, pass the original features to the final estimator.
+            cv (int): Number of cross-validation folds for stacking.
+
+        Returns:
+            StackingClassifier: The stacking classifier.
+        """
+        self.logger.info("Creating Stacking Classifier for model merging...")
+        estimators = []
+        for model_name in base_models:
+            if model_name in self.tuned_models:
+                model = self.tuned_models[model_name]
+                self.logger.info(f"Using tuned model: {model_name} for stacking.")
+            else:
+                model = self.models.get(model_name)
+                if model is None:
+                    self.logger.warning(f"Model {model_name} not found. Skipping.")
+                    continue
+                self.logger.info(f"Using default model: {model_name} for stacking.")
+            estimators.append((model_name, model))
+
+        if not estimators:
+            self.logger.error("No valid base models provided for stacking.")
+            raise ValueError("No valid base models provided for stacking.")
+
+        if final_estimator is None:
+            final_estimator = LogisticRegression(random_state=self.random_state)
+
+        stacking_clf = StackingClassifier(
+            estimators=estimators,
+            final_estimator=final_estimator,
+            passthrough=passthrough,
+            cv=cv,
+            n_jobs=-1,
+        )
+
+        # Fit the stacking classifier
+        self.logger.info("Training Stacking Classifier...")
+        stacking_clf.fit(X_train, y_train)
+
+        return stacking_clf
