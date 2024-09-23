@@ -17,6 +17,8 @@ from sklearn.ensemble import (
     GradientBoostingClassifier,
     VotingClassifier,
     StackingClassifier,  # Added for stacking
+    BaggingClassifier,
+    AdaBoostClassifier
 )
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -923,55 +925,102 @@ class ClassificationSolver:
         base_models: List[str],
         X_train: pd.DataFrame,
         y_train: pd.Series,
+        method: str = "stacking",  # New argument to select the ensemble method
         final_estimator: Optional[BaseEstimator] = None,
         passthrough: bool = False,
         cv: int = 5,
-    ) -> StackingClassifier:
+        n_estimators: int = 10  # For bagging and boosting
+    ) -> BaseEstimator:
         """
-        Creates a Stacking Classifier by merging multiple base models with a final estimator.
+        Creates an ensemble model by merging multiple base models using different ensemble techniques.
+        Supports stacking, bagging, boosting, and voting.
 
         Args:
             base_models (List[str]): List of model names to be used as base models.
             X_train (pd.DataFrame): Training features.
             y_train (pd.Series): Training target.
-            final_estimator (Optional[BaseEstimator]): The final estimator to combine base models. Defaults to LogisticRegression.
-            passthrough (bool): If True, pass the original features to the final estimator.
+            method (str): The ensemble method to use ('stacking', 'bagging', 'boosting', or 'voting').
+            final_estimator (Optional[BaseEstimator]): The final estimator to combine base models for stacking. Defaults to LogisticRegression.
+            passthrough (bool): If True, pass the original features to the final estimator (only for stacking).
             cv (int): Number of cross-validation folds for stacking.
+            n_estimators (int): Number of estimators for bagging or boosting.
 
         Returns:
-            StackingClassifier: The stacking classifier.
+            BaseEstimator: The ensemble model.
         """
-        self.logger.info("Creating Stacking Classifier for model merging...")
+        self.logger.info(f"Creating {method.capitalize()} Classifier for model merging...")
+
+        # Collect base models
         estimators = []
         for model_name in base_models:
             if model_name in self.tuned_models:
                 model = self.tuned_models[model_name]
-                self.logger.info(f"Using tuned model: {model_name} for stacking.")
+                self.logger.info(f"Using tuned model: {model_name} for {method}.")
             else:
                 model = self.models.get(model_name)
                 if model is None:
                     self.logger.warning(f"Model {model_name} not found. Skipping.")
                     continue
-                self.logger.info(f"Using default model: {model_name} for stacking.")
+                self.logger.info(f"Using default model: {model_name} for {method}.")
             estimators.append((model_name, model))
 
         if not estimators:
-            self.logger.error("No valid base models provided for stacking.")
-            raise ValueError("No valid base models provided for stacking.")
+            self.logger.error(f"No valid base models provided for {method}.")
+            raise ValueError(f"No valid base models provided for {method}.")
 
-        if final_estimator is None:
+        # Define the final estimator for stacking
+        if final_estimator is None and method == "stacking":
             final_estimator = LogisticRegression(random_state=self.random_state)
 
-        stacking_clf = StackingClassifier(
-            estimators=estimators,
-            final_estimator=final_estimator,
-            passthrough=passthrough,
-            cv=cv,
-            n_jobs=-1,
-        )
+        # Ensemble Methods
+        if method == "stacking":
+            # Stacking Classifier
+            ensemble_model = StackingClassifier(
+                estimators=estimators,
+                final_estimator=final_estimator,
+                passthrough=passthrough,
+                cv=cv,
+                n_jobs=-1,
+            )
 
-        # Fit the stacking classifier
-        self.logger.info("Training Stacking Classifier...")
-        stacking_clf.fit(X_train, y_train)
+        elif method == "bagging":
+            # Bagging Classifier
+            base_estimator = estimators[0][1] if len(estimators) == 1 else DecisionTreeClassifier(random_state=self.random_state)
+            ensemble_model = BaggingClassifier(
+                base_estimator=base_estimator,
+                n_estimators=n_estimators,
+                random_state=self.random_state,
+                n_jobs=-1,
+            )
 
-        return stacking_clf
+        elif method == "boosting":
+            # Boosting Classifier (Gradient Boosting or AdaBoost)
+            if "Gradient Boosting" in base_models:
+                ensemble_model = GradientBoostingClassifier(
+                    n_estimators=n_estimators,
+                    random_state=self.random_state,
+                )
+            else:
+                # Default to AdaBoost if Gradient Boosting is not in base models
+                ensemble_model = AdaBoostClassifier(
+                    base_estimator=estimators[0][1] if len(estimators) == 1 else DecisionTreeClassifier(random_state=self.random_state),
+                    n_estimators=n_estimators,
+                    random_state=self.random_state,
+                )
+
+        elif method == "voting":
+            # Voting Classifier
+            ensemble_model = VotingClassifier(estimators=estimators, voting='soft', n_jobs=-1)
+
+        else:
+            self.logger.error(f"Unknown ensemble method: {method}")
+            raise ValueError(f"Unknown ensemble method: {method}")
+
+        # Fit the ensemble model
+        self.logger.info(f"Training {method.capitalize()} Classifier...")
+        ensemble_model.fit(X_train, y_train)
+
+        # Store the ensemble model in tuned_models for future use
+        self.tuned_models[f"{method.capitalize()} Classifier"] = ensemble_model
+
+        return ensemble_model
