@@ -246,7 +246,7 @@ class ClassificationSolver:
                 "max_depth": optuna.distributions.IntDistribution(low=1, high=100, log=False),  # Updated
                 "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, log=False),  # Updated
                 "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, log=False),  # Updated
-                "max_features": optuna.distributions.CategoricalDistribution(choices=["auto", "sqrt", "log2"]),
+                "max_features": optuna.distributions.CategoricalDistribution(choices=["sqrt", "log2"]),
             },
             "Gradient Boosting": {
                 "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, log=False),  # Updated
