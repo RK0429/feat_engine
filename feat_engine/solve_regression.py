@@ -178,67 +178,67 @@ class RegressionSolver:
         """
         return {
             "Ridge Regression": {
-                "alpha": optuna.distributions.LogUniformDistribution(1e-4, 1e4),
-                "solver": optuna.distributions.CategoricalDistribution(["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"]),
+                "alpha": optuna.distributions.FloatDistribution(low=1e-4, high=1e4, distribution='log'),  # Updated
+                "solver": optuna.distributions.CategoricalDistribution(choices=["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"]),
             },
             "Lasso Regression": {
-                "alpha": optuna.distributions.LogUniformDistribution(1e-4, 1e1),
-                "selection": optuna.distributions.CategoricalDistribution(["cyclic", "random"]),
+                "alpha": optuna.distributions.FloatDistribution(low=1e-4, high=1e1, distribution='log'),  # Updated
+                "selection": optuna.distributions.CategoricalDistribution(choices=["cyclic", "random"]),
             },
             "ElasticNet Regression": {
-                "alpha": optuna.distributions.LogUniformDistribution(1e-4, 1e1),
-                "l1_ratio": optuna.distributions.FloatUniformDistribution(0.0, 1.0),
+                "alpha": optuna.distributions.FloatDistribution(low=1e-4, high=1e1, distribution='log'),  # Updated
+                "l1_ratio": optuna.distributions.FloatDistribution(low=0.0, high=1.0, distribution='uniform'),  # Updated
             },
             "Decision Tree": {
-                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
-                "min_samples_split": optuna.distributions.IntUniformDistribution(2, 20),
-                "min_samples_leaf": optuna.distributions.IntUniformDistribution(1, 20),
-                "criterion": optuna.distributions.CategoricalDistribution(["squared_error", "friedman_mse", "absolute_error", "poisson"]),
+                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, distribution='uniform'),  # Updated
+                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, distribution='uniform'),  # Updated
+                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, distribution='uniform'),  # Updated
+                "criterion": optuna.distributions.CategoricalDistribution(choices=["squared_error", "friedman_mse", "absolute_error", "poisson"]),
             },
             "Random Forest": {
-                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
-                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
-                "min_samples_split": optuna.distributions.IntUniformDistribution(2, 20),
-                "min_samples_leaf": optuna.distributions.IntUniformDistribution(1, 20),
-                "bootstrap": optuna.distributions.CategoricalDistribution([True, False]),
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, distribution='uniform'),  # Updated
+                "min_samples_split": optuna.distributions.IntDistribution(low=2, high=20, distribution='uniform'),  # Updated
+                "min_samples_leaf": optuna.distributions.IntDistribution(low=1, high=20, distribution='uniform'),  # Updated
+                "bootstrap": optuna.distributions.CategoricalDistribution(choices=[True, False]),
             },
             "Gradient Boosting": {
-                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
-                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
-                "max_depth": optuna.distributions.IntUniformDistribution(3, 20),
-                "subsample": optuna.distributions.FloatUniformDistribution(0.5, 1.0),
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=3, high=20, distribution='uniform'),  # Updated
+                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
             },
             "AdaBoost": {
-                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
-                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
-                "loss": optuna.distributions.CategoricalDistribution(["linear", "square", "exponential"]),
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
+                "loss": optuna.distributions.CategoricalDistribution(choices=["linear", "square", "exponential"]),
             },
             "Support Vector Regressor": {
-                "C": optuna.distributions.LogUniformDistribution(1e-3, 1e3),
-                "kernel": optuna.distributions.CategoricalDistribution(["linear", "rbf", "poly", "sigmoid"]),
-                "gamma": optuna.distributions.CategoricalDistribution(["scale", "auto"]),
-                "epsilon": optuna.distributions.FloatUniformDistribution(0.0, 1.0),
+                "C": optuna.distributions.FloatDistribution(low=1e-3, high=1e3, distribution='log'),  # Updated
+                "kernel": optuna.distributions.CategoricalDistribution(choices=["linear", "rbf", "poly", "sigmoid"]),
+                "gamma": optuna.distributions.CategoricalDistribution(choices=["scale", "auto"]),
+                "epsilon": optuna.distributions.FloatDistribution(low=0.0, high=1.0, distribution='uniform'),  # Updated
             },
             "XGBoost": {
-                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
-                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
-                "max_depth": optuna.distributions.IntUniformDistribution(3, 20),
-                "subsample": optuna.distributions.FloatUniformDistribution(0.5, 1.0),
-                "colsample_bytree": optuna.distributions.FloatUniformDistribution(0.5, 1.0),
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=3, high=20, distribution='uniform'),  # Updated
+                "subsample": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
+                "colsample_bytree": optuna.distributions.FloatDistribution(low=0.5, high=1.0, distribution='uniform'),  # Updated
             },
             "LightGBM": {
-                "n_estimators": optuna.distributions.IntUniformDistribution(50, 1000),
-                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
-                "num_leaves": optuna.distributions.IntUniformDistribution(20, 150),
-                "max_depth": optuna.distributions.IntUniformDistribution(1, 100),
+                "n_estimators": optuna.distributions.IntDistribution(low=50, high=1000, distribution='uniform'),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
+                "num_leaves": optuna.distributions.IntDistribution(low=20, high=150, distribution='uniform'),  # Updated
+                "max_depth": optuna.distributions.IntDistribution(low=1, high=100, distribution='uniform'),  # Updated
             },
             "CatBoost": {
-                "iterations": optuna.distributions.IntUniformDistribution(100, 1000),
-                "learning_rate": optuna.distributions.LogUniformDistribution(1e-4, 1.0),
-                "depth": optuna.distributions.IntUniformDistribution(3, 16),
-                "l2_leaf_reg": optuna.distributions.IntUniformDistribution(1, 10),
-                "border_count": optuna.distributions.IntUniformDistribution(32, 256),
-                "bagging_temperature": optuna.distributions.FloatUniformDistribution(0.0, 5.0),
+                "iterations": optuna.distributions.IntDistribution(low=100, high=1000, distribution='uniform'),  # Updated
+                "learning_rate": optuna.distributions.FloatDistribution(low=1e-4, high=1.0, distribution='log'),  # Updated
+                "depth": optuna.distributions.IntDistribution(low=3, high=16, distribution='uniform'),  # Updated
+                "l2_leaf_reg": optuna.distributions.IntDistribution(low=1, high=10, distribution='uniform'),  # Updated
+                "border_count": optuna.distributions.IntDistribution(low=32, high=256, distribution='uniform'),  # Updated
+                "bagging_temperature": optuna.distributions.FloatDistribution(low=0.0, high=5.0, distribution='uniform'),  # Updated
             },
         }
 
@@ -516,7 +516,13 @@ class RegressionSolver:
                 )
                 return
 
-            study = optuna.create_study(direction="minimize" if 'mse' in scoring else "maximize")
+            # Determine the direction based on the scoring metric
+            if 'neg_' in scoring or 'mse' in scoring or 'mae' in scoring:
+                direction = "minimize"
+            else:
+                direction = "maximize"
+
+            study = optuna.create_study(direction=direction)
             func = self._create_objective(model, param_distributions, X_train, y_train, cv, scoring)
             study.optimize(func, n_trials=n_iter, show_progress_bar=True)
             best_params = study.best_params
@@ -566,11 +572,12 @@ class RegressionSolver:
             for param, distribution in param_distributions.items():
                 if isinstance(distribution, optuna.distributions.CategoricalDistribution):
                     params[param] = trial.suggest_categorical(param, distribution.choices)
-                elif isinstance(distribution, optuna.distributions.LogUniformDistribution):
-                    params[param] = trial.suggest_loguniform(param, distribution.low, distribution.high)
-                elif isinstance(distribution, optuna.distributions.FloatUniformDistribution):
-                    params[param] = trial.suggest_float(param, distribution.low, distribution.high)
-                elif isinstance(distribution, optuna.distributions.IntUniformDistribution):
+                elif isinstance(distribution, optuna.distributions.FloatDistribution):
+                    if distribution.distribution == 'log':
+                        params[param] = trial.suggest_loguniform(param, distribution.low, distribution.high)
+                    else:
+                        params[param] = trial.suggest_uniform(param, distribution.low, distribution.high)
+                elif isinstance(distribution, optuna.distributions.IntDistribution):
                     params[param] = trial.suggest_int(param, distribution.low, distribution.high)
                 else:
                     # Handle other distribution types if necessary
@@ -587,7 +594,7 @@ class RegressionSolver:
             ).mean()
 
             # If the scoring is a negative metric (like neg_mean_squared_error), return it as is for minimization
-            if 'neg_' in scoring:
+            if 'neg_' in scoring or 'mse' in scoring or 'mae' in scoring:
                 return score  # Optuna will minimize this
             else:
                 return score  # Optuna will maximize this
@@ -907,7 +914,7 @@ class RegressionSolver:
                 if 'neg_' in metric:
                     scores[metric] = {
                         "mean": -float(np.mean(score)),
-                        "std": -float(np.std(score)),
+                        "std": float(np.std(score)),
                     }
                 else:
                     scores[metric] = {
