@@ -4,14 +4,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import optuna  # Added for Bayesian optimization
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import (
     RandomForestRegressor,
     GradientBoostingRegressor,
     AdaBoostRegressor,
+    StackingRegressor,  # Added for stacking
+    BaggingRegressor,
+    VotingRegressor
 )
 from sklearn.linear_model import (
     LinearRegression,
@@ -48,7 +52,7 @@ class RegressionSolver:
     """
     A comprehensive class for solving regression problems using various machine learning models.
     Includes methods for data preprocessing, model training, evaluation, hyperparameter tuning,
-    cross-validation, and model persistence.
+    cross-validation, model merging, and model persistence.
     """
 
     def __init__(
@@ -83,9 +87,16 @@ class RegressionSolver:
             "Gradient Boosting": GradientBoostingRegressor(random_state=self.random_state),
             "AdaBoost": AdaBoostRegressor(random_state=self.random_state),
             "Support Vector Regressor": SVR(),
-            "XGBoost": XGBRegressor(random_state=self.random_state, objective="reg:squarederror"),
+            "XGBoost": XGBRegressor(
+                random_state=self.random_state,
+                objective="reg:squarederror",
+                use_label_encoder=False,  # Added to suppress warnings
+                eval_metric='rmse'  # Added for clarity
+            ),
             "LightGBM": LGBMRegressor(random_state=self.random_state),
-            "CatBoost": CatBoostRegressor(verbose=0, random_state=self.random_state),
+            "CatBoost": CatBoostRegressor(
+                verbose=0, random_state=self.random_state
+            ),
         }
 
     def _default_param_grids(self) -> Dict[str, Dict[str, List[Any]]]:
@@ -308,7 +319,7 @@ class RegressionSolver:
         scoring: str = "neg_mean_squared_error",
     ) -> None:
         """
-        Performs hyperparameter tuning using GridSearchCV or RandomizedSearchCV for one or all models and stores the best models.
+        Performs hyperparameter tuning using GridSearchCV, RandomizedSearchCV, or Bayesian Optimization for one or all models and stores the best models.
 
         Args:
             model_name (str): The name of the model to tune. If 'all', tunes all models in self.models.
@@ -316,8 +327,8 @@ class RegressionSolver:
             y_train (pd.Series): Training target.
             param_grid (Optional[Dict[str, List[Any]]]): Parameter grid for hyperparameter tuning. If None, uses default.
             cv (int): Number of cross-validation folds.
-            search_type (str): Type of search ('grid' or 'random').
-            n_iter (int): Number of iterations for RandomizedSearchCV.
+            search_type (str): Type of search ('grid', 'random', or 'bayesian').
+            n_iter (int): Number of iterations for RandomizedSearchCV or Bayesian Optimization.
             scoring (str): Scoring metric for evaluation.
 
         Returns:
@@ -361,8 +372,8 @@ class RegressionSolver:
             y_train (pd.Series): Training target.
             param_grid (Optional[Dict[str, List[Any]]]): Parameter grid for hyperparameter tuning. If None, uses default.
             cv (int): Number of cross-validation folds.
-            search_type (str): Type of search ('grid' or 'random').
-            n_iter (int): Number of iterations for RandomizedSearchCV.
+            search_type (str): Type of search ('grid', 'random', or 'bayesian').
+            n_iter (int): Number of iterations for RandomizedSearchCV or Bayesian Optimization.
             scoring (str): Scoring metric for evaluation.
 
         Returns:
@@ -388,6 +399,12 @@ class RegressionSolver:
                 n_jobs=-1,
                 verbose=1,
             )
+            search.fit(X_train, y_train)
+            self.logger.info(
+                f"Best parameters found for {model_name}: {search.best_params_}"
+            )
+            # Store the tuned model for future use
+            self.tuned_models[model_name] = search.best_estimator_
         elif search_type == "random":
             search = RandomizedSearchCV(
                 model,
@@ -399,16 +416,87 @@ class RegressionSolver:
                 verbose=1,
                 random_state=self.random_state,
             )
+            search.fit(X_train, y_train)
+            self.logger.info(
+                f"Best parameters found for {model_name}: {search.best_params_}"
+            )
+            # Store the tuned model for future use
+            self.tuned_models[model_name] = search.best_estimator_
+        elif search_type == "bayesian":  # Added Bayesian optimization
+            self.logger.info(f"Using Bayesian Optimization for {model_name}...")
+            study = optuna.create_study(direction="maximize")
+            func = self._create_objective(model, param_grid, X_train, y_train, cv, scoring)
+            study.optimize(func, n_trials=n_iter)
+            best_params = study.best_params
+            self.logger.info(f"Best parameters found for {model_name}: {best_params}")
+            model.set_params(**best_params)
+            model.fit(X_train, y_train)
+            self.tuned_models[model_name] = model
         else:
-            raise ValueError("search_type must be either 'grid' or 'random'.")
+            raise ValueError("search_type must be either 'grid', 'random', or 'bayesian'.")
 
-        search.fit(X_train, y_train)
-        self.logger.info(
-            f"Best parameters found for {model_name}: {search.best_params_}"
-        )
+    def _create_objective(
+        self,
+        model: BaseEstimator,
+        param_grid: Dict[str, List[Any]],
+        X: pd.DataFrame,
+        y: pd.Series,
+        cv: int,
+        scoring: str,
+    ) -> Callable[[optuna.trial.Trial], float]:
+        """
+        Creates an objective function for Optuna to optimize model hyperparameters.
 
-        # Store the tuned model for future use
-        self.tuned_models[model_name] = search.best_estimator_
+        Args:
+            model (BaseEstimator): The machine learning model to be optimized.
+            param_grid (Dict[str, List[Any]]): The grid of hyperparameters to search over.
+            X (pd.DataFrame): Training data for features.
+            y (pd.Series): Target labels for training data.
+            cv (int): The number of cross-validation folds.
+            scoring (str): The scoring metric to evaluate model performance.
+
+        Returns:
+            Callable[[optuna.trial.Trial], float]: The objective function to be minimized or maximized by Optuna.
+        """
+
+        def objective(trial: optuna.trial.Trial) -> Any:
+            """
+            The actual objective function used by Optuna to evaluate a set of hyperparameters.
+
+            Args:
+                trial (optuna.trial.Trial): A single trial instance that suggests hyperparameters.
+
+            Returns:
+                float: The mean cross-validated score for the suggested hyperparameter set.
+            """
+            params = {}
+            for param, values in param_grid.items():
+                if isinstance(values, list):
+                    # Categorical or discrete parameters
+                    params[param] = trial.suggest_categorical(param, values)
+                elif isinstance(values, np.ndarray):
+                    # Continuous parameters
+                    params[param] = trial.suggest_float(param, float(values.min()), float(values.max()))
+                else:
+                    # Handle float or integer ranges
+                    params[param] = trial.suggest_float(param, float(min(values)), float(max(values)))
+
+            model.set_params(**params)
+
+            # Define cross-validation strategy
+            if isinstance(cv, int):
+                cv_strategy = KFold(n_splits=cv, shuffle=True, random_state=self.random_state)
+            else:
+                cv_strategy = cv
+
+            # Perform cross-validation
+            score = cross_val_score(
+                model, X, y, cv=cv_strategy, scoring=scoring, n_jobs=-1
+            ).mean()
+
+            return score
+
+        return objective
 
     def auto_select_best_model(
         self, X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5, scoring: str = "neg_mean_squared_error"
@@ -429,7 +517,7 @@ class RegressionSolver:
         self.logger.info(
             "Automatically selecting the best model based on cross-validated score..."
         )
-        best_score = float('-inf')
+        best_score = float('-inf')  # Initialize to negative infinity
         best_model_name = ""
 
         for model_name in self.models:
@@ -450,7 +538,7 @@ class RegressionSolver:
                 f"{model_name} - Mean Score: {mean_score:.4f}, Std: {std_score:.4f}"
             )
 
-            # For negative scoring metrics, higher (less negative) is better
+            # For scoring metrics where higher is better (e.g., neg_mean_squared_error)
             if mean_score > best_score:
                 best_score = mean_score
                 best_model_name = model_name
@@ -459,6 +547,43 @@ class RegressionSolver:
             f"Best model selected: {best_model_name} with cross-validated score: {best_score:.4f}"
         )
         return best_model_name, best_score
+
+    def compare_models(
+        self, X_train: pd.DataFrame, y_train: pd.Series, cv: int = 5, scoring: str = "neg_mean_squared_error"
+    ) -> pd.DataFrame:
+        """
+        Compares multiple models based on cross-validation scores.
+
+        Args:
+            X_train (pd.DataFrame): Training features.
+            y_train (pd.Series): Training target.
+            cv (int): Number of cross-validation folds.
+            scoring (str): Scoring metric for evaluation.
+
+        Returns:
+            pd.DataFrame: DataFrame containing models and their scores.
+        """
+        self.logger.info("Comparing models...")
+        results = []
+        cv_strategy = KFold(n_splits=cv, shuffle=True, random_state=self.random_state)
+
+        for model_name in self.models:
+            self.logger.info(f"Evaluating model: {model_name}")
+            model = self.tuned_models.get(model_name, self.models[model_name])
+            scores = cross_val_score(
+                model, X_train, y_train, cv=cv_strategy, scoring=scoring, n_jobs=-1
+            )
+            results.append(
+                {
+                    "Model": model_name,
+                    "Mean Score": scores.mean(),
+                    "Std Score": scores.std(),
+                }
+            )
+        results_df = pd.DataFrame(results)
+        results_df.sort_values(by="Mean Score", ascending=False, inplace=True)
+        self.logger.info("Model comparison results:\n" + results_df.to_string(index=False))
+        return results_df
 
     def plot_residuals(
         self, model: BaseEstimator, X_test: pd.DataFrame, y_test: pd.Series
@@ -498,6 +623,7 @@ class RegressionSolver:
         sns.histplot(residuals, kde=True, color="blue")
         plt.title("Residual Distribution")
         plt.xlabel("Residuals")
+        plt.ylabel("Frequency")
         plt.show()
 
     def plot_feature_importance(
@@ -584,6 +710,7 @@ class RegressionSolver:
             train_sizes=np.linspace(0.1, 1.0, 5),
             random_state=self.random_state,
         )
+        # For negative scoring metrics, convert to positive
         train_scores_mean = -np.mean(train_scores, axis=1)
         test_scores_mean = -np.mean(test_scores, axis=1)
 
@@ -633,3 +760,108 @@ class RegressionSolver:
         model = joblib.load(filename)
         self.logger.info(f"Model loaded from {filename}")
         return model
+
+    def model_merging(
+        self,
+        base_models: List[str],
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        method: str = "stacking",  # New argument to select the ensemble method
+        final_estimator: Optional[BaseEstimator] = None,
+        passthrough: bool = False,
+        cv: int = 5,
+        n_estimators: int = 10  # For bagging and boosting
+    ) -> BaseEstimator:
+        """
+        Creates an ensemble model by merging multiple base models using different ensemble techniques.
+        Supports stacking, bagging, boosting, and voting.
+
+        Args:
+            base_models (List[str]): List of model names to be used as base models.
+            X_train (pd.DataFrame): Training features.
+            y_train (pd.Series): Training target.
+            method (str): The ensemble method to use ('stacking', 'bagging', 'boosting', or 'voting').
+            final_estimator (Optional[BaseEstimator]): The final estimator to combine base models for stacking. Defaults to Ridge.
+            passthrough (bool): If True, pass the original features to the final estimator (only for stacking).
+            cv (int): Number of cross-validation folds for stacking.
+            n_estimators (int): Number of estimators for bagging or boosting.
+
+        Returns:
+            BaseEstimator: The ensemble model.
+        """
+        self.logger.info(f"Creating {method.capitalize()} Regressor for model merging...")
+
+        # Collect base models
+        estimators = []
+        for model_name in base_models:
+            if model_name in self.tuned_models:
+                model = self.tuned_models[model_name]
+                self.logger.info(f"Using tuned model: {model_name} for {method}.")
+            else:
+                model = self.models.get(model_name)
+                if model is None:
+                    self.logger.warning(f"Model {model_name} not found. Skipping.")
+                    continue
+                self.logger.info(f"Using default model: {model_name} for {method}.")
+            estimators.append((model_name, model))
+
+        if not estimators:
+            self.logger.error(f"No valid base models provided for {method}.")
+            raise ValueError(f"No valid base models provided for {method}.")
+
+        # Define the final estimator for stacking
+        if final_estimator is None and method == "stacking":
+            final_estimator = Ridge(random_state=self.random_state)
+
+        # Ensemble Methods
+        if method == "stacking":
+            # Stacking Regressor
+            ensemble_model = StackingRegressor(
+                estimators=estimators,
+                final_estimator=final_estimator,
+                passthrough=passthrough,
+                cv=cv,
+                n_jobs=-1,
+            )
+
+        elif method == "bagging":
+            # Bagging Regressor
+            base_estimator = estimators[0][1] if len(estimators) == 1 else RandomForestRegressor(random_state=self.random_state)
+            ensemble_model = BaggingRegressor(
+                base_estimator=base_estimator,
+                n_estimators=n_estimators,
+                random_state=self.random_state,
+                n_jobs=-1,
+            )
+
+        elif method == "boosting":
+            # Boosting Regressor (Gradient Boosting or AdaBoost)
+            if "Gradient Boosting" in base_models:
+                ensemble_model = GradientBoostingRegressor(
+                    n_estimators=n_estimators,
+                    random_state=self.random_state,
+                )
+            else:
+                # Default to AdaBoost if Gradient Boosting is not in base models
+                ensemble_model = AdaBoostRegressor(
+                    base_estimator=estimators[0][1] if len(estimators) == 1 else DecisionTreeRegressor(random_state=self.random_state),
+                    n_estimators=n_estimators,
+                    random_state=self.random_state,
+                )
+
+        elif method == "voting":
+            # Voting Regressor
+            ensemble_model = VotingRegressor(estimators=estimators, n_jobs=-1)
+
+        else:
+            self.logger.error(f"Unknown ensemble method: {method}")
+            raise ValueError(f"Unknown ensemble method: {method}")
+
+        # Fit the ensemble model
+        self.logger.info(f"Training {method.capitalize()} Regressor...")
+        ensemble_model.fit(X_train, y_train)
+
+        # Store the ensemble model in tuned_models for future use
+        self.tuned_models[f"{method.capitalize()} Regressor"] = ensemble_model
+
+        return ensemble_model
