@@ -736,6 +736,57 @@ class RegressionSolver:
         plt.grid()
         plt.show()
 
+    def cross_validate_model(
+        self,
+        model: BaseEstimator,
+        X: pd.DataFrame,
+        y: pd.Series,
+        cv: int = 5,
+        scoring: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Cross-validates the model using the specified number of folds and returns detailed metrics.
+
+        Args:
+            model (BaseEstimator): The model to cross-validate.
+            X (pd.DataFrame): Feature matrix.
+            y (pd.Series): Target variable.
+            cv (int): Number of cross-validation folds.
+            scoring (Optional[List[str]]): List of scoring metrics to evaluate (default: None uses common regression metrics).
+
+        Returns:
+            Dict[str, Any]: Cross-validation metrics including R2, MAE, MSE, RMSE, etc.
+        """
+        self.logger.info("Cross-validating the provided model...")
+
+        # Define cross-validation strategy
+        cv_strategy = KFold(n_splits=cv, shuffle=True, random_state=self.random_state)
+
+        # Default scoring metrics if none are provided
+        if scoring is None:
+            scoring = ['neg_mean_absolute_error', 'neg_mean_squared_error', 'neg_root_mean_squared_error', 'r2']
+
+        # Perform cross-validation for all required metrics
+        scores = {}
+        for metric in scoring:
+            self.logger.info(f"Calculating {metric}...")
+            score = cross_val_score(
+                model, X, y, cv=cv_strategy, scoring=metric, n_jobs=-1
+            )
+            # For negative metrics, we convert back to positive values
+            if 'neg_' in metric:
+                scores[metric] = {
+                    "mean": -float(np.mean(score)),
+                    "std": -float(np.std(score)),
+                }
+            else:
+                scores[metric] = {
+                    "mean": float(np.mean(score)),
+                    "std": float(np.std(score)),
+                }
+
+        return scores
+
     def save_model(self, model: BaseEstimator, filename: str) -> None:
         """
         Saves the trained model to disk.
