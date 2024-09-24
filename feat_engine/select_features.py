@@ -794,37 +794,37 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             search_space = [
                 # SelectKBest with ANOVA F-test
                 {
-                    'selector__selector_type': 'selectkbest_f_classif',
+                    'selector__selector_type': Categorical(['selectkbest_f_classif']),
                     'selector__k': Integer(k_min, k_max),
                 },
                 # SelectKBest with Mutual Information
                 {
-                    'selector__selector_type': 'selectkbest_mutual_info_classif',
+                    'selector__selector_type': Categorical(['selectkbest_mutual_info_classif']),
                     'selector__k': Integer(k_min, k_max),
                 },
                 # Variance Threshold
                 {
-                    'selector__selector_type': 'variance_threshold',
+                    'selector__selector_type': Categorical(['variance_threshold']),
                     'selector__threshold': Real(0.0, 0.5, prior='uniform'),
                 },
                 # RFE with Logistic Regression
                 {
-                    'selector__selector_type': 'rfe',
+                    'selector__selector_type': Categorical(['rfe']),
                     'selector__n_features_to_select': Integer(k_min, k_max),
                 },
                 # Lasso-based selection
                 {
-                    'selector__selector_type': 'lasso',
+                    'selector__selector_type': Categorical(['lasso']),
                     'selector__alpha': Real(0.1, 10.0, prior='log-uniform'),
                 },
                 # Feature Importance from Model
                 {
-                    'selector__selector_type': 'feature_importance',
+                    'selector__selector_type': Categorical(['feature_importance']),
                     'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
                 # Correlation-based selection (no parameters)
                 {
-                    'selector__selector_type': 'correlation',
+                    'selector__selector_type': Categorical(['correlation']),
                 },
             ]
         else:
@@ -832,37 +832,37 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             search_space = [
                 # SelectKBest with F-regression
                 {
-                    'selector__selector_type': 'selectkbest_f_regression',
+                    'selector__selector_type': Categorical(['selectkbest_f_regression']),
                     'selector__k': Integer(k_min, k_max),
                 },
                 # SelectKBest with Mutual Information
                 {
-                    'selector__selector_type': 'selectkbest_mutual_info_regression',
+                    'selector__selector_type': Categorical(['selectkbest_mutual_info_regression']),
                     'selector__k': Integer(k_min, k_max),
                 },
                 # Variance Threshold
                 {
-                    'selector__selector_type': 'variance_threshold',
+                    'selector__selector_type': Categorical(['variance_threshold']),
                     'selector__threshold': Real(0.0, 0.5, prior='uniform'),
                 },
                 # RFE with Lasso
                 {
-                    'selector__selector_type': 'rfe',
+                    'selector__selector_type': Categorical(['rfe']),
                     'selector__n_features_to_select': Integer(k_min, k_max),
                 },
                 # Lasso-based selection
                 {
-                    'selector__selector_type': 'lasso',
+                    'selector__selector_type': Categorical(['lasso']),
                     'selector__alpha': Real(0.1, 10.0, prior='log-uniform'),
                 },
                 # Feature Importance from Model
                 {
-                    'selector__selector_type': 'feature_importance',
+                    'selector__selector_type': Categorical(['feature_importance']),
                     'selector__threshold': Categorical(['mean', 'median', 0.0]),
                 },
                 # Correlation-based selection (no parameters)
                 {
-                    'selector__selector_type': 'correlation',
+                    'selector__selector_type': Categorical(['correlation']),
                 },
             ]
 
