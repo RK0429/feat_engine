@@ -277,6 +277,40 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
         self.support_ = X.columns.isin(self.selected_features_)
 
 
+class CorrelationSelector(BaseEstimator, TransformerMixin):
+    """
+    Selects features based on correlation with other features.
+
+    Parameters
+    ----------
+    threshold : float, default=0.9
+        Features with a correlation higher than this threshold will be removed.
+    """
+    def __init__(self, threshold: float = 0.9):
+        self.threshold = threshold
+        self.selected_features_ = None
+
+    def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> "CorrelationSelector":
+        # Compute the correlation matrix
+        corr_matrix = X.corr().abs()
+
+        # Select upper triangle of correlation matrix
+        upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+
+        # Find features with correlation greater than the threshold
+        to_drop = [column for column in upper.columns if any(upper[column] > self.threshold)]
+
+        # Select features to keep
+        self.selected_features_ = [column for column in X.columns if column not in to_drop]  # type: ignore
+
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        if self.selected_features_ is None:
+            raise NotFittedError("CorrelationSelector has not been fitted yet.")
+        return X[self.selected_features_]
+
+
 class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
     """
     Wrapper for different feature selection methods to be used within a pipeline.
@@ -311,6 +345,7 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             - 'selectfrommodel'
             - 'lasso'
             - 'feature_importance'
+            - 'correlation'
 
         score_func : callable, optional
             Scoring function for SelectKBest methods.
@@ -406,6 +441,11 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
                 self.estimator = RandomForestClassifier(random_state=42)
             self.selector_ = SelectFromModel(estimator=self.estimator, threshold=self.threshold)
             self.selector_.fit(X, y)
+        elif self.selector_type == 'correlation':
+            # Initialize the custom CorrelationSelector with a default threshold
+            corr_threshold = self.threshold if isinstance(self.threshold, float) else 0.9
+            self.selector_ = CorrelationSelector(threshold=corr_threshold)
+            self.selector_.fit(X)
         else:
             raise ValueError(f"Unknown selector type: {self.selector_type}")
 
@@ -431,10 +471,25 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
                     support = self.selector_.get_support()
                     self.selected_features_ = X.columns[support].tolist()
 
+            elif self.selector_type == 'correlation':
+                # Lower the threshold and refit
+                new_threshold = max(self.threshold / 2, 0.5) if isinstance(self.threshold, float) else 0.5
+                self.selector_ = CorrelationSelector(threshold=new_threshold)
+                self.selector_.fit(X)
+                support = self.selector_.get_support()
+                self.selected_features_ = X.columns[support].tolist()
+
+                # If still no features, select the feature with the highest variance
+                if not self.selected_features_:
+                    self.selector_ = SelectKBest(score_func=f_classif, k=1)
+                    self.selector_.fit(X, y)
+                    support = self.selector_.get_support()
+                    self.selected_features_ = X.columns[support].tolist()
+
             else:
                 # Handle other selectors if needed
-                # For example, set k=1 for SelectKBest variants
                 if self.selector_type.startswith('selectkbest'):
+                    # Set k=1 for SelectKBest variants
                     self.selector_.k = 1
                     self.selector_.fit(X, y)
                     support = self.selector_.get_support()
@@ -930,9 +985,10 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                         LogisticRegression(solver='liblinear', random_state=42)
                     ]),
                 },
-                # Correlation-based selection (no parameters)
+                # Correlation-based selection
                 {
                     'selector__selector_type': Categorical(['correlation']),
+                    'selector__threshold': Real(0.5, 0.9, prior='uniform'),  # Define threshold range
                 },
             ]
         else:
@@ -976,9 +1032,10 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                         Lasso(alpha=1.0, random_state=42)
                     ]),
                 },
-                # Correlation-based selection (no parameters)
+                # Correlation-based selection
                 {
                     'selector__selector_type': Categorical(['correlation']),
+                    'selector__threshold': Real(0.5, 0.9, prior='uniform'),  # Define threshold range
                 },
             ]
 
