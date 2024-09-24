@@ -290,10 +290,10 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
         selector_type: str = 'selectkbest_f_classif',
         score_func: Optional[Any] = None,
         k: int = 10,
-        threshold: float = 0.0,
+        threshold: Union[float, str] = 0.0,
         estimator: Optional[Any] = None,
         n_features_to_select: int = 10,
-        alpha: float = 1.0,  # Added alpha parameter
+        alpha: float = 1.0,  # For Lasso
     ) -> None:
         """
         Initialize the FeatureSelectorWrapper.
@@ -310,6 +310,7 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             - 'rfe'
             - 'selectfrommodel'
             - 'lasso'
+            - 'feature_importance'
 
         score_func : callable, optional
             Scoring function for SelectKBest methods.
@@ -317,8 +318,9 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
         k : int, default=10
             Number of top features to select for SelectKBest.
 
-        threshold : float, default=0.0
+        threshold : float or str, default=0.0
             Threshold for VarianceThreshold or SelectFromModel.
+            For SelectFromModel, can also be 'mean', 'median', etc.
 
         estimator : estimator object, optional
             Estimator to use for RFE or SelectFromModel.
@@ -335,9 +337,10 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
         self.threshold = threshold
         self.estimator = estimator
         self.n_features_to_select = n_features_to_select
-        self.alpha = alpha  # Store alpha
+        self.alpha = alpha
 
         self.selector_: Optional[BaseEstimator] = None
+        self.selected_features_: Optional[List[str]] = None
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> 'FeatureSelectorWrapper':
         """
@@ -396,37 +399,24 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             lasso = Lasso(alpha=self.alpha, random_state=42)
             self.selector_ = SelectFromModel(estimator=lasso)
             self.selector_.fit(X, y)
+        elif self.selector_type == 'feature_importance':
+            if self.estimator is None:
+                # Define default estimator based on problem type
+                # Assuming classification; adjust as needed
+                self.estimator = RandomForestClassifier(random_state=42)
+            self.selector_ = SelectFromModel(estimator=self.estimator, threshold=self.threshold)
+            self.selector_.fit(X, y)
         else:
             raise ValueError(f"Unknown selector type: {self.selector_type}")
 
-        # Ensure at least one feature is selected
+        # Get support mask and selected features
         support = self.selector_.get_support()
-        if not np.any(support):
-            if self.selector_type.startswith('selectkbest'):
-                # Select the top feature
-                self.selector_.k = 1
-                self.selector_.fit(X, y)
-                support = self.selector_.get_support()
-            elif self.selector_type == 'variance_threshold':
-                # Lower the threshold and refit
-                self.selector_.threshold = 0.0
-                self.selector_.fit(X)
-                support = self.selector_.get_support()
-            elif self.selector_type == 'selectfrommodel' or self.selector_type == 'lasso':
-                # Refine the estimator or lower the threshold
-                self.selector_.threshold = 'median'  # Example adjustment
-                self.selector_.fit(X, y)
-                support = self.selector_.get_support()
-            else:
-                # For other methods, force select one feature
-                self.selector_ = SelectKBest(score_func=f_classif, k=1).fit(X, y)
-                support = self.selector_.get_support()
-
-            # Final check
-            if not np.any(support):
-                raise ValueError(f"Feature selection method '{self.selector_type}' failed to select any features.")
-
         self.selected_features_ = X.columns[support].tolist()
+
+        # Safeguard: Ensure at least one feature is selected
+        if not self.selected_features_:
+            raise ValueError(f"Feature selection method '{self.selector_type}' selected no features.")
+
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -443,9 +433,28 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
         X_transformed : pd.DataFrame
             The transformed feature matrix containing only the selected features.
         """
-        if self.selector_ is None:
+        if self.selector_ is None or self.selected_features_ is None:
             raise NotFittedError("This FeatureSelectorWrapper instance is not fitted yet.")
         return X[self.selected_features_]
+
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> pd.DataFrame:
+        """
+        Fit to data, then transform it.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input feature matrix.
+
+        y : pd.Series, optional
+            The target variable. Required for supervised feature selection methods.
+
+        Returns
+        -------
+        X_transformed : pd.DataFrame
+            The transformed feature matrix containing only the selected features.
+        """
+        return self.fit(X, y).transform(X)
 
     def get_support(self, indices: bool = False) -> Union[np.ndarray, List[int], Any]:
         """
@@ -463,10 +472,10 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             The mask of selected features, or array of indices.
         """
         if self.selector_ is None:
-            raise NotFittedError("This FeatureSelectorWrapper instance is not fitted yet.")
+            raise NotFittedError("The model has not been fitted yet!")
         return self.selector_.get_support(indices=indices)
 
-    def get_feature_names_out(self, input_features: Optional[List[str]] = None) -> List[str] | Any:
+    def get_feature_names_out(self, input_features: Optional[List[str]] = None) -> List[str]:
         """
         Get output feature names for transformation.
 
@@ -481,7 +490,7 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             The list of selected feature names.
         """
         if self.selected_features_ is None:
-            raise NotFittedError("This FeatureSelectorWrapper instance is not fitted yet.")
+            raise NotFittedError("The model has not been fitted yet!")
         if input_features is None:
             raise ValueError("input_features must be provided.")
         return self.selected_features_
@@ -731,7 +740,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         """
         num_columns = X.shape[1]
         step = max(1, num_columns // 5)  # Ensure step is at least 1
-        k_min = 1
+        k_min = 1  # Changed from 5 to 1 to ensure at least one feature is selected
         k_max = num_columns
         k_values = list(range(k_min, k_max + 1, step))  # Inclusive of k_max
 
@@ -767,6 +776,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': ['feature_importance'],
                     'selector__threshold': ['mean', 'median', 0.0],
+                    'selector__estimator': [RandomForestClassifier(random_state=42)],
                 },
                 # Correlation-based selection (no parameters)
                 {
@@ -806,6 +816,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': ['feature_importance'],
                     'selector__threshold': ['mean', 'median', 0.0],
+                    'selector__estimator': [RandomForestRegressor(random_state=42)],
                 },
                 # Correlation-based selection (no parameters)
                 {
@@ -830,7 +841,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             The parameter search space.
         """
         num_columns = X.shape[1]
-        k_min = 1
+        k_min = 1  # Changed from 5 to 1 to ensure at least one feature is selected
         k_max = num_columns
 
         if self.problem_type == 'classification':
@@ -868,6 +879,10 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': Categorical(['feature_importance']),
                     'selector__threshold': Categorical(['mean', 'median', 0.0]),
+                    'selector__estimator': Categorical([
+                        RandomForestClassifier(random_state=42),
+                        LogisticRegression(solver='liblinear', random_state=42)
+                    ]),
                 },
                 # Correlation-based selection (no parameters)
                 {
@@ -910,6 +925,10 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': Categorical(['feature_importance']),
                     'selector__threshold': Categorical(['mean', 'median', 0.0]),
+                    'selector__estimator': Categorical([
+                        RandomForestRegressor(random_state=42),
+                        Lasso(alpha=1.0, random_state=42)
+                    ]),
                 },
                 # Correlation-based selection (no parameters)
                 {
