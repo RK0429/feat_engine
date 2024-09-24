@@ -398,9 +398,38 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             self.selector_.fit(X, y)
         else:
             raise ValueError(f"Unknown selector type: {self.selector_type}")
+
+        # Ensure at least one feature is selected
+        support = self.selector_.get_support()
+        if not np.any(support):
+            if self.selector_type.startswith('selectkbest'):
+                # Select the top feature
+                self.selector_.k = 1
+                self.selector_.fit(X, y)
+                support = self.selector_.get_support()
+            elif self.selector_type == 'variance_threshold':
+                # Lower the threshold and refit
+                self.selector_.threshold = 0.0
+                self.selector_.fit(X)
+                support = self.selector_.get_support()
+            elif self.selector_type == 'selectfrommodel' or self.selector_type == 'lasso':
+                # Refine the estimator or lower the threshold
+                self.selector_.threshold = 'median'  # Example adjustment
+                self.selector_.fit(X, y)
+                support = self.selector_.get_support()
+            else:
+                # For other methods, force select one feature
+                self.selector_ = SelectKBest(score_func=f_classif, k=1).fit(X, y)
+                support = self.selector_.get_support()
+
+            # Final check
+            if not np.any(support):
+                raise ValueError(f"Feature selection method '{self.selector_type}' failed to select any features.")
+
+        self.selected_features_ = X.columns[support].tolist()
         return self
 
-    def transform(self, X: pd.DataFrame) -> np.ndarray | Any:
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
         Reduce X to the selected features.
 
@@ -411,12 +440,12 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        X_transformed : np.ndarray
+        X_transformed : pd.DataFrame
             The transformed feature matrix containing only the selected features.
         """
         if self.selector_ is None:
             raise NotFittedError("This FeatureSelectorWrapper instance is not fitted yet.")
-        return self.selector_.transform(X)
+        return X[self.selected_features_]
 
     def get_support(self, indices: bool = False) -> Union[np.ndarray, List[int], Any]:
         """
@@ -437,7 +466,7 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             raise NotFittedError("This FeatureSelectorWrapper instance is not fitted yet.")
         return self.selector_.get_support(indices=indices)
 
-    def get_feature_names_out(self, input_features: Optional[List[str]] = None) -> List[str]:
+    def get_feature_names_out(self, input_features: Optional[List[str]] = None) -> List[str] | Any:
         """
         Get output feature names for transformation.
 
@@ -451,12 +480,11 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
         selected_features : List[str]
             The list of selected feature names.
         """
-        if self.selector_ is None:
+        if self.selected_features_ is None:
             raise NotFittedError("This FeatureSelectorWrapper instance is not fitted yet.")
         if input_features is None:
             raise ValueError("input_features must be provided.")
-        support = self.get_support(indices=True)
-        return [input_features[i] for i in support]
+        return self.selected_features_
 
 
 class AutoFeatureSelector(BaseEstimator, TransformerMixin):
@@ -703,7 +731,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
         """
         num_columns = X.shape[1]
         step = max(1, num_columns // 5)  # Ensure step is at least 1
-        k_min = 5
+        k_min = 1
         k_max = num_columns
         k_values = list(range(k_min, k_max + 1, step))  # Inclusive of k_max
 
@@ -802,7 +830,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             The parameter search space.
         """
         num_columns = X.shape[1]
-        k_min = 5
+        k_min = 1
         k_max = num_columns
 
         if self.problem_type == 'classification':
