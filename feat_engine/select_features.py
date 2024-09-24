@@ -415,7 +415,53 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
 
         # Safeguard: Ensure at least one feature is selected
         if not self.selected_features_:
-            raise ValueError(f"Feature selection method '{self.selector_type}' selected no features.")
+            if self.selector_type == 'lasso':
+                # Lower the alpha and refit
+                self.alpha = max(self.alpha / 10, 0.0001)  # Prevent alpha from becoming too small
+                lasso = Lasso(alpha=self.alpha, random_state=42)
+                self.selector_ = SelectFromModel(estimator=lasso)
+                self.selector_.fit(X, y)
+                support = self.selector_.get_support()
+                self.selected_features_ = X.columns[support].tolist()
+
+                # If still no features, select the feature with the highest variance
+                if not self.selected_features_:
+                    self.selector_ = SelectKBest(score_func=f_classif, k=1)
+                    self.selector_.fit(X, y)
+                    support = self.selector_.get_support()
+                    self.selected_features_ = X.columns[support].tolist()
+
+            else:
+                # Handle other selectors if needed
+                # For example, set k=1 for SelectKBest variants
+                if self.selector_type.startswith('selectkbest'):
+                    self.selector_.k = 1
+                    self.selector_.fit(X, y)
+                    support = self.selector_.get_support()
+                    self.selected_features_ = X.columns[support].tolist()
+                elif self.selector_type == 'variance_threshold':
+                    # Lower the threshold and refit
+                    self.selector_.threshold = 0.0
+                    self.selector_.fit(X)
+                    support = self.selector_.get_support()
+                    self.selected_features_ = X.columns[support].tolist()
+                elif self.selector_type == 'feature_importance':
+                    # Adjust estimator's parameters or use default
+                    self.estimator = RandomForestClassifier(random_state=42)
+                    self.selector_ = SelectFromModel(estimator=self.estimator, threshold='median')
+                    self.selector_.fit(X, y)
+                    support = self.selector_.get_support()
+                    self.selected_features_ = X.columns[support].tolist()
+                else:
+                    # Fallback to SelectKBest with k=1
+                    self.selector_ = SelectKBest(score_func=f_classif, k=1)
+                    self.selector_.fit(X, y)
+                    support = self.selector_.get_support()
+                    self.selected_features_ = X.columns[support].tolist()
+
+            # Final check
+            if not self.selected_features_:
+                raise ValueError(f"Feature selection method '{self.selector_type}' failed to select any features.")
 
         return self
 
@@ -770,7 +816,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # Lasso-based selection
                 {
                     'selector__selector_type': ['lasso'],
-                    'selector__alpha': [0.1, 1.0, 10.0],
+                    'selector__alpha': [0.001, 0.01, 0.1, 1.0],
                 },
                 # Feature Importance from Model
                 {
@@ -810,7 +856,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # Lasso-based selection
                 {
                     'selector__selector_type': ['lasso'],
-                    'selector__alpha': [0.1, 1.0, 10.0],
+                    'selector__alpha': [0.001, 0.01, 0.1, 1.0],
                 },
                 # Feature Importance from Model
                 {
@@ -841,7 +887,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             The parameter search space.
         """
         num_columns = X.shape[1]
-        k_min = 1  # Changed from 5 to 1 to ensure at least one feature is selected
+        k_min = 1  # Ensure at least one feature is selected
         k_max = num_columns
 
         if self.problem_type == 'classification':
@@ -873,7 +919,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # Lasso-based selection
                 {
                     'selector__selector_type': Categorical(['lasso']),
-                    'selector__alpha': Real(0.1, 10.0, prior='log-uniform'),
+                    'selector__alpha': Real(0.001, 1.0, prior='log-uniform'),  # Lowered max alpha
                 },
                 # Feature Importance from Model
                 {
@@ -919,7 +965,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 # Lasso-based selection
                 {
                     'selector__selector_type': Categorical(['lasso']),
-                    'selector__alpha': Real(0.1, 10.0, prior='log-uniform'),
+                    'selector__alpha': Real(0.001, 1.0, prior='log-uniform'),  # Lowered max alpha
                 },
                 # Feature Importance from Model
                 {
