@@ -288,7 +288,9 @@ class CorrelationSelector(BaseEstimator, TransformerMixin):
     """
     def __init__(self, threshold: float = 0.9):
         self.threshold = threshold
-        self.selected_features_ = None
+        self.selected_features_: List[Any] | None = None
+        self.support_: List[Any] | None = None
+        self.feature_names_in_ = None
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> "CorrelationSelector":
         # Compute the correlation matrix
@@ -301,7 +303,13 @@ class CorrelationSelector(BaseEstimator, TransformerMixin):
         to_drop = [column for column in upper.columns if any(upper[column] > self.threshold)]
 
         # Select features to keep
-        self.selected_features_ = [column for column in X.columns if column not in to_drop]  # type: ignore
+        self.selected_features_ = [column for column in X.columns if column not in to_drop]
+
+        # Store feature names
+        self.feature_names_in_ = X.columns.tolist()
+
+        # Create support mask
+        self.support_ = [feature in self.selected_features_ for feature in self.feature_names_in_]  # type: ignore
 
         return self
 
@@ -309,6 +317,28 @@ class CorrelationSelector(BaseEstimator, TransformerMixin):
         if self.selected_features_ is None:
             raise NotFittedError("CorrelationSelector has not been fitted yet.")
         return X[self.selected_features_]
+
+    def get_support(self, indices: bool = False) -> Union[np.ndarray, List[int], Any]:
+        """
+        Get a mask or integer index of the features selected.
+
+        Parameters
+        ----------
+        indices : bool, default=False
+            If True, the return value will be an array of indices of the selected features.
+            If False, the return value will be a boolean mask.
+
+        Returns
+        -------
+        support : Union[np.ndarray, List[int]]
+            The mask of selected features, or array of indices.
+        """
+        if self.support_ is None:
+            raise NotFittedError("CorrelationSelector has not been fitted yet.")
+        support_array = np.array(self.support_)
+        if indices:
+            return np.where(support_array)[0]
+        return support_array
 
 
 class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
