@@ -715,6 +715,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': ['rfe'],
                     'selector__n_features_to_select': k_values,
+                    'selector__estimator': [LogisticRegression(solver='liblinear', random_state=42)],
                 },
                 # Lasso-based selection
                 {
@@ -753,6 +754,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': ['rfe'],
                     'selector__n_features_to_select': k_values,
+                    'selector__estimator': [Lasso(alpha=1.0, random_state=42)],
                 },
                 # Lasso-based selection
                 {
@@ -811,6 +813,10 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': Categorical(['rfe']),
                     'selector__n_features_to_select': Integer(k_min, k_max),
+                    'selector__estimator': Categorical([
+                        LogisticRegression(solver='liblinear', random_state=42),
+                        RandomForestClassifier(random_state=42)
+                    ]),
                 },
                 # Lasso-based selection
                 {
@@ -849,6 +855,10 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 {
                     'selector__selector_type': Categorical(['rfe']),
                     'selector__n_features_to_select': Integer(k_min, k_max),
+                    'selector__estimator': Categorical([
+                        Lasso(alpha=1.0, random_state=42),
+                        RandomForestRegressor(random_state=42)
+                    ]),
                 },
                 # Lasso-based selection
                 {
