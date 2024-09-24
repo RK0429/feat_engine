@@ -523,7 +523,11 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
 
         # Define default machine learning model if not provided
         if self.model is None:
-            self.model = RandomForestClassifier(random_state=self.random_state) if self.problem_type == 'classification' else RandomForestRegressor(random_state=self.random_state)
+            self.model = (
+                RandomForestClassifier(random_state=self.random_state)
+                if self.problem_type == 'classification'
+                else RandomForestRegressor(random_state=self.random_state)
+            )
 
         # Define the pipeline with FeatureSelectorWrapper
         pipeline = Pipeline([
@@ -694,12 +698,12 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             param_grid = [
                 # SelectKBest with ANOVA F-test
                 {
-                    'selector__selector_type': ['selectkbest_anova'],
+                    'selector__selector_type': ['selectkbest_f_classif'],
                     'selector__k': k_values,
                 },
                 # SelectKBest with Mutual Information
                 {
-                    'selector__selector_type': ['selectkbest_mutual_info'],
+                    'selector__selector_type': ['selectkbest_mutual_info_classif'],
                     'selector__k': k_values,
                 },
                 # Variance Threshold
@@ -737,7 +741,7 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
                 },
                 # SelectKBest with Mutual Information
                 {
-                    'selector__selector_type': ['selectkbest_mutual_info'],
+                    'selector__selector_type': ['selectkbest_mutual_info_regression'],
                     'selector__k': k_values,
                 },
                 # Variance Threshold
@@ -790,12 +794,12 @@ class AutoFeatureSelector(BaseEstimator, TransformerMixin):
             search_space = [
                 # SelectKBest with ANOVA F-test
                 {
-                    'selector__selector_type': 'selectkbest_anova',
+                    'selector__selector_type': 'selectkbest_f_classif',
                     'selector__k': Integer(k_min, k_max),
                 },
                 # SelectKBest with Mutual Information
                 {
-                    'selector__selector_type': 'selectkbest_mutual_info',
+                    'selector__selector_type': 'selectkbest_mutual_info_classif',
                     'selector__k': Integer(k_min, k_max),
                 },
                 # Variance Threshold
