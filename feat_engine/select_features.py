@@ -293,6 +293,7 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
         threshold: float = 0.0,
         estimator: Optional[Any] = None,
         n_features_to_select: int = 10,
+        alpha: float = 1.0,  # Added alpha parameter
     ) -> None:
         """
         Initialize the FeatureSelectorWrapper.
@@ -308,6 +309,7 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             - 'variance_threshold'
             - 'rfe'
             - 'selectfrommodel'
+            - 'lasso'
 
         score_func : callable, optional
             Scoring function for SelectKBest methods.
@@ -323,6 +325,9 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
 
         n_features_to_select : int, default=10
             Number of features to select for RFE.
+
+        alpha : float, default=1.0
+            Regularization strength for Lasso-based selection.
         """
         self.selector_type = selector_type
         self.score_func = score_func
@@ -330,6 +335,7 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
         self.threshold = threshold
         self.estimator = estimator
         self.n_features_to_select = n_features_to_select
+        self.alpha = alpha  # Store alpha
 
         self.selector_: Optional[BaseEstimator] = None
 
@@ -382,6 +388,13 @@ class FeatureSelectorWrapper(BaseEstimator, TransformerMixin):
             if self.estimator is None:
                 raise ValueError("Estimator must be provided for SelectFromModel.")
             self.selector_ = SelectFromModel(estimator=self.estimator, threshold=self.threshold)
+            self.selector_.fit(X, y)
+        elif self.selector_type == 'lasso':
+            if y is None:
+                raise ValueError("y cannot be None for lasso.")
+            # Initialize Lasso estimator with the provided alpha
+            lasso = Lasso(alpha=self.alpha, random_state=42)
+            self.selector_ = SelectFromModel(estimator=lasso)
             self.selector_.fit(X, y)
         else:
             raise ValueError(f"Unknown selector type: {self.selector_type}")
